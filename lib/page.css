@@ -3,14 +3,6 @@
  * @license Apache-2.0
  */
 
-/* Zero the margin and padding of most elements. */
-html, body, header, main, footer,
- figure, figcaption, h1, h2, h3, p, ol, ul, li, audio, video,
- a, span /* prettier-ignore */ {
-  margin: 0;
-  padding: 0;
-}
-
 body {
   margin: 1em auto;
   padding: 0 1em;
@@ -20,46 +12,92 @@ body {
   line-height: 1.5;
 }
 
-h1,
-h2,
-h3 {
-  font-weight: bold;
-  line-height: 1.2;
+/* Many block elements should have a 1em trailing margin. */
+header, footer, figure, figcaption, h1, h2, h3, p, ol, ul, li /* prettier-ignore */ {
+  margin: 0 0 1em 0;
+  padding: 0;
+}
+
+ul {
+  margin: 0;
+  padding-left: 2em;
 }
 
 h1 {
   font-size: 300%;
+  font-weight: bold;
+  line-height: 1.2;
   margin-bottom: 0.33333333em;
 }
 
 h2 {
   font-size: 200%;
+  font-weight: normal;
+  line-height: 1.2;
   margin-bottom: 0.5em;
 }
 
 h3 {
   font-size: 160%;
+  font-weight: normal;
+  line-height: 1.2;
   margin-bottom: 0.66666666em;
 }
 
-p, ul {
-  margin-bottom: 1em;
+header.site {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
 
-footer.page {
+header.site > img {
+  margin-right: 1em;
+  width: auto;
+  height: 5em;
+}
+
+header.site > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+header.site > div > h1 {
+  margin-bottom: 0;
+}
+
+footer.site {
   border-top: 1px solid #000;
   padding-top: 0.5em;
+  font-size: 75%;
 }
 
-ul.hdot {
+header.page > h2 {
+  margin-bottom: 0em;
+}
+
+header.page > .date {
+  color: #666;
+  font-size: 75%;
+  font-weight: bold;
+}
+
+ul.hdot, ul.hslash {
+  padding-left: 0;
   list-style: none;
 }
 
-ul.hdot > li {
+ul.hdot > li, ul.hslash > li {
   display: inline-block;
+  margin: 0;
 }
 
 ul.hdot > li + li:before {
   content: "\2022";
+  padding: 0 0.5em;
+}
+
+ul.hslash > li + li:before {
+  content: "/";
   padding: 0 0.5em;
 }

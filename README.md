@@ -13,7 +13,7 @@ development mode using live-server:
 
 ```
 npm i -g live-server
-live-server --host=localhost --mount=/lib:./lib examples/01-hello
+live-server --host=localhost --mount=/lib:./lib examples
 ```
 
 ## License and Warranty Disclaimer
