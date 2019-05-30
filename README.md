@@ -8,12 +8,12 @@ a fast, convenient, modern toolchain for websites that can be learned from.
 
 ## Usage
 
-A more integrated command-line tool is coming soon. For the moment, try the
-development mode using live-server:
+More documentation and features are coming soon. For the moment, try the
+development server:
 
 ```
-npm i -g live-server
-live-server --host=localhost --mount=/lib:./lib examples
+npm i
+node minimal-magic serve examples
 ```
 
 ## License and Warranty Disclaimer

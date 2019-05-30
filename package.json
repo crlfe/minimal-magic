@@ -1,0 +1,17 @@
+{
+  "name": "minimal-magic",
+  "version": "0.1.0",
+  "description": "Tools for a Website with Minimal Magic",
+  "homepage": "https://github.com/crlfe/minimal-magic",
+  "license": "Apache-2.0",
+  "author": "Chris Wolfe (https://crlfe.ca)",
+  "bin": "./minimal-magic.js",
+  "repository": "github:crlfe/minimal-magic",
+  "private": true,
+  "dependencies": {
+    "@babel/core": "^7.4.5",
+    "@babel/plugin-transform-modules-commonjs": "^7.4.4",
+    "@babel/register": "^7.4.4",
+    "live-server": "^1.2.1"
+  }
+}
