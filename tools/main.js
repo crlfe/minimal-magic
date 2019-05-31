@@ -3,32 +3,41 @@
  * @license Apache-2.0
  */
 
+import fs from "fs";
 import path from "path";
-import liveServer from "live-server";
+
+import buildCommand from "./build";
+import serveCommand from "./serve";
 
 const HELP_MESSAGE = `\
 Usage: minimal-magic <command> ...
 Tools for a Website with Minimal Magic
 
 Commands:
-  build     Compile a release version of the website
-  serve     Start a local development server
+  build     Compile a release version of the website.
+  serve     Start a local development server.
+
+  help      Display this information, then exit.
+  version   Display version and licensing information, then exit.
 
 For details on a command, try 'minimal-magic <command> --help'.
 `;
 
 const BUILD_HELP_MESSAGE = `\
-Usage: minimal-magic build [PATH]
-Builds a production version of the website
+Usage: minimal-magic build [OPTION]... [SRC]
+Builds a production version of the website in SRC (default "./src")
+
+Options:
+  --out=PATH    (default "./out")
 `;
 
 const SERVE_HELP_MESSAGE = `\
-Usage: minimal-magic serve [PATH]
-Starts a development server for the website
+Usage: minimal-magic serve [OPTION]... [SRC]
+Starts a development server for the website in SRC (default "./src")
 
 Options:
-  --host=HOST
-  --port=PORT
+  --host=HOST    (default localhost)
+  --port=PORT    (default 8080)
 `;
 
 const VERSION_MESSAGE = `\
@@ -50,48 +59,77 @@ limitations under the License.
 `;
 
 export default async function main(argv) {
-  const command = argv[2];
-  const options = parseArgs(argv.slice(3));
-  if (!command) {
+  const usageError = genericUsageError.bind(null, ["minimal-magic"]);
+
+  const [options, operands] = parseArgs(argv.slice(2));
+  const command = operands.shift();
+
+  if (command === "help" || (!command && options.help)) {
+    console.log(HELP_MESSAGE);
+  } else if (command === "version" || (!command && options.version)) {
+    console.log(VERSION_MESSAGE);
+  } else if (!command) {
     usageError("Expected a command");
   } else if (command === "build") {
-    await doBuild(options);
+    await doBuild(options, operands);
   } else if (command === "serve") {
-    await doServe(options);
-  } else if (command === "help" || command === "--help") {
-    console.log(HELP_MESSAGE);
-  } else if (command === "version" || command === "--version") {
-    console.log(VERSION_MESSAGE);
+    await doServe(options, operands);
   } else {
     usageError(`Unrecognized command ${JSON.stringify(command)}`);
   }
 }
 
-async function doBuild(options) {
+async function doBuild(options, operands) {
+  const usageError = genericUsageError.bind(null, ["minimal-magic", "build"]);
+
   if (options.help) {
     console.log(BUILD_HELP_MESSAGE);
-  } else if (options._.length > 1) {
-    usageError("Expected at most one source directory", "build");
-  } else {
-    const src = path.resolve(options._[0] || ".");
-    delete options._;
-
-    throw new Error("TODO: build is not implemented yet");
+    return;
   }
+
+  if (operands.length > 1) {
+    usageError("Expected at most one source directory");
+    return;
+  }
+
+  const src = path.resolve(operands[0] || "./src");
+  if (!checkSourceDirectory(src, { usageError, fatalError })) {
+    return;
+  }
+
+  let { out, ...unknown } = options;
+  if (Object.keys(unknown).length > 0) {
+    const name = Object.keys(unknown)[0];
+    usageError(`Unrecognized option ${JSON.stringify(name)}`);
+    return;
+  }
+
+  out = path.resolve(out || "./out");
+  if (!ensureOutputDirectory(out, { usageError, fatalError })) {
+    return;
+  }
+
+  // TODO: What should this use for an output directory?
+  await buildCommand({ src, out });
 }
 
-async function doServe(options) {
+async function doServe(options, operands) {
+  const usageError = genericUsageError.bind(null, ["minimal-magic", "serve"]);
+
   if (options.help) {
     console.log(SERVE_HELP_MESSAGE);
     return;
   }
-  if (options._.length > 1) {
-    usageError("Expected at most one source directory", "serve");
+
+  if (operands.length > 1) {
+    usageError("Expected at most one source directory");
     return;
   }
 
-  const src = path.resolve(options._[0] || ".");
-  delete options._;
+  const src = path.resolve(operands[0] || "./src");
+  if (!checkSourceDirectory(src, { usageError, fatalError })) {
+    return;
+  }
 
   let { host, port, ...unknown } = options;
   if (Object.keys(unknown).length > 0) {
@@ -99,6 +137,7 @@ async function doServe(options) {
     usageError(`Unrecognized option ${JSON.stringify(name)}`);
     return;
   }
+
   if (!host) {
     host = "localhost";
   }
@@ -106,33 +145,72 @@ async function doServe(options) {
     port = "8080";
   }
 
-  liveServer.start({
-    root: src,
-    host,
-    port,
-    mount: [["/lib", path.resolve(__dirname, "..", "lib")]]
-  });
+  await serveCommand({ src, host, port });
 }
 
-function usageError(message, context) {
-  context = ["minimal-magic", context].filter(v => v).join(" ");
+function genericUsageError(context, message) {
   console.error(
     [
-      `minimal-magic: ${message}`,
-      `Try '${context} --help' for more information.`
+      `${context.join(" ")}: ${message}`,
+      `Try '${context.join(" ")} --help' for more information.`
     ].join("\n")
   );
   process.exitCode = 2;
 }
 
+function fatalError(message, err) {
+  console.error(message + ":\n  " + err.message.replace(/\n/g, "\n  "));
+  process.exitCode = 1;
+}
+
+function checkSourceDirectory(src, { usageError, fatalError }) {
+  try {
+    const srcStats = fs.statSync(src);
+    if (!srcStats.isDirectory()) {
+      usageError(`Expected source ${JSON.stringify(src)} to be a directory`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      usageError(`Missing source directory ${JSON.stringify(src)}`);
+      return false;
+    } else {
+      fatalError(`Failed to read source from ${JSON.stringify(src)}`, err);
+      return false;
+    }
+  }
+}
+
+function ensureOutputDirectory(out, { usageError, fatalError }) {
+  try {
+    const outStats = fs.statSync(out);
+    if (!outStats.isDirectory()) {
+      usageError(`Expected output ${JSON.stringify(out)} to be a directory`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    if (err.code === "EANOENT") {
+      usageError(`TODO: missing output directory ${JSON.stringify(out)}`);
+      return false;
+    } else {
+      fatalError(`Failed to write output to ${JSON.stringify(out)}`, err);
+      return false;
+    }
+  }
+}
+
 function parseArgs(args) {
-  const options = { _: [] };
+  const options = {};
+  const operands = [];
+
   let doneOptions = false;
   for (const arg of args) {
     if (arg === "-") {
-      options._.push(arg);
+      operands.push(arg);
     } else if (arg === "--") {
-      ignoreOptions = true;
+      doneOptions = true;
     } else if (arg.startsWith("-") && !doneOptions) {
       const tail = arg.replace(/^--?/, "");
       const equals = tail.indexOf("=");
@@ -142,8 +220,8 @@ function parseArgs(args) {
         options[tail.slice(0, equals)] = tail.slice(equals + 1);
       }
     } else {
-      options._.push(arg);
+      operands.push(arg);
     }
   }
-  return options;
+  return [options, operands];
 }

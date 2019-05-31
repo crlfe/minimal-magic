@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-"use strict";
-
 /**
  * @author Chris Wolfe
  * @license Apache-2.0
  */
+
+"use strict";
 
 process.title = "minimal-magic";
 
