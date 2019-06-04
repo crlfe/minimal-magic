@@ -3,6 +3,7 @@
  * @license Apache-2.0
  */
 
+import entities from "entities";
 import express from "express";
 import fs from "fs";
 import glob from "glob";
@@ -129,6 +130,14 @@ async function compilePage(browser, url, outputFiles) {
     filepath: url.pathname,
     parser: "html"
   });
+
+  // Ensure the document begins with a DOCTYPE.
+  if (!content.startsWith("<!DOCTYPE")) {
+    content = "<!DOCTYPE html>\n" + content;
+  }
+
+  // Replace non-ASCII characters with their encoded forms.
+  content = content.replace(/[^\n\r\t\x20-\x7F]/g, x => entities.encodeHTML(x));
 
   console.log("  html", url.pathname);
   outputFiles.set(url.pathname, content);
