@@ -4,10 +4,14 @@
  */
 
 import fs from "fs";
+import mkdirp from "mkdirp";
 import path from "path";
+import util from "util";
 
 import buildCommand from "./build";
 import serveCommand from "./serve";
+
+const mkdirpPromise = util.promisify(mkdirp);
 
 const HELP_MESSAGE = `\
 Usage: minimal-magic <command> ...
@@ -109,7 +113,6 @@ async function doBuild(options, operands) {
     return;
   }
 
-  // TODO: What should this use for an output directory?
   await buildCommand({ src, out });
 }
 
@@ -176,13 +179,16 @@ function checkSourceDirectory(src, { usageError, fatalError }) {
       usageError(`Missing source directory ${JSON.stringify(src)}`);
       return false;
     } else {
-      fatalError(`Failed to read source from ${JSON.stringify(src)}`, err);
+      fatalError(
+        `Failed to read from source directory ${JSON.stringify(src)}`,
+        err
+      );
       return false;
     }
   }
 }
 
-function ensureOutputDirectory(out, { usageError, fatalError }) {
+async function ensureOutputDirectory(out, { usageError, fatalError }) {
   try {
     const outStats = fs.statSync(out);
     if (!outStats.isDirectory()) {
@@ -191,11 +197,22 @@ function ensureOutputDirectory(out, { usageError, fatalError }) {
     }
     return true;
   } catch (err) {
-    if (err.code === "EANOENT") {
-      usageError(`TODO: missing output directory ${JSON.stringify(out)}`);
-      return false;
+    if (err.code === "ENOENT") {
+      try {
+        await mkdirpPromise(out);
+      } catch (err) {
+        fatalError(
+          `Failed to create output directory ${JSON.stringify(out)}`,
+          err
+        );
+        return false;
+      }
+      return true;
     } else {
-      fatalError(`Failed to write output to ${JSON.stringify(out)}`, err);
+      fatalError(
+        `Failed to write to output directory ${JSON.stringify(out)}`,
+        err
+      );
       return false;
     }
   }

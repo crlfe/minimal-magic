@@ -16,6 +16,13 @@ npm i
 node minimal-magic serve examples
 ```
 
+or compile the examples and look at the output:
+
+```
+node minimal-magic build examples
+cat out/index.html
+```
+
 ## License and Warranty Disclaimer
 
 Copyright 2019 Chris Wolfe
