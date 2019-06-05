@@ -122,6 +122,18 @@ async function compilePage(browser, url, outputFiles) {
     timeout: 10000,
     waitUntil: "networkidle2"
   });
+  await page.evaluate(() => {
+    // Remove build-time scripts.
+    // TODO: Should we leave an inactive script or comment in the output?
+    document.querySelectorAll("script[data-build]").forEach(script => {
+      const parent = script.parentNode;
+      const next = script.nextSibling;
+      if (next && next.nodeType === Node.TEXT_NODE) {
+        next.textContent = next.textContent.replace(/^\n/, "");
+      }
+      parent.removeChild(script);
+    });
+  });
 
   let content = await page.content();
   await page.close();
@@ -135,6 +147,9 @@ async function compilePage(browser, url, outputFiles) {
   if (!content.startsWith("<!DOCTYPE")) {
     content = "<!DOCTYPE html>\n" + content;
   }
+
+  // Remove any trailing whitespace and blank lines.
+  content = content.replace(/\s+\n/g, "\n");
 
   // Replace non-ASCII characters with their encoded forms.
   content = content.replace(/[^\n\r\t\x20-\x7F]/g, x => entities.encodeHTML(x));
