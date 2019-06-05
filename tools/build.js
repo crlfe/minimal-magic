@@ -126,12 +126,7 @@ async function compilePage(browser, url, outputFiles) {
     // Remove build-time scripts.
     // TODO: Should we leave an inactive script or comment in the output?
     document.querySelectorAll("script[data-build]").forEach(script => {
-      const parent = script.parentNode;
-      const next = script.nextSibling;
-      if (next && next.nodeType === Node.TEXT_NODE) {
-        next.textContent = next.textContent.replace(/^\n/, "");
-      }
-      parent.removeChild(script);
+      script.parentNode.removeChild(script);
     });
   });
 
