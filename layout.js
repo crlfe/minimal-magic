@@ -36,7 +36,7 @@ async function setupPage(doc) {
     insertAll(doc.body, doc.body.firstChild, await getSiteHeader(doc, ld));
   }
 
-  if (!doc.querySelector("main > header")) {
+  if (!doc.querySelector("main > header") && !isRootPage) {
     const main = doc.querySelector("main");
     insertAll(main, main.firstChild, getPageHeader(doc, ld));
   }
