@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="64">
+  <clipPath id="slash">
+    <path d="M 0 0 48 0 48 16 0 40 Z"/>
+    <path d="M 48 64 0 64 0 48 48 24 Z"/>
+  </clipPath>
+  <ellipse
+    cx="24" cy="32" rx="22" ry="30"
+    clip-path="url(#slash)"
+    style="fill: #B6B; stroke: none;" />
+</svg>

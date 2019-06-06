@@ -10,12 +10,8 @@ import { addHtmlMetadata } from "/lib/metadata.js";
 
 const SITE = {
   "@type": "WebSite",
-  headline: "Minimal Magic Examples",
+  headline: "Minimal Magic",
   inLanguage: "en",
-  image: {
-    "@type": "Image",
-    contentUrl: "/logo.svg"
-  },
   copyrightHolder: {
     "@type": "Person",
     name: "Chris Wolfe"
@@ -41,11 +37,8 @@ async function setupPage(doc) {
   }
 
   if (!doc.querySelector("main > header")) {
-    // Do not add a page header that repeats the site headline.
-    if (ld.headline !== ld.isPartOf.headline) {
-      const main = doc.querySelector("main");
-      insertAll(main, main.firstChild, getPageHeader(doc, ld));
-    }
+    const main = doc.querySelector("main");
+    insertAll(main, main.firstChild, getPageHeader(doc, ld));
   }
 
   if (!doc.querySelector("body > footer")) {
@@ -73,7 +66,7 @@ async function getSiteHeader(doc, ld) {
     ]);
 
   return h("header", { class: "site" }, [
-    h("img", { src: site.image.contentUrl, alt: "Example logo" }),
+    h("img", { src: "/logo.svg", alt: "" }),
     h("div", {}, [h("h1", {}, site.headline), breadcrumbNav])
   ]);
 }
@@ -87,24 +80,15 @@ function getPageHeader(doc, ld) {
 }
 
 function getSiteFooter(doc, ld) {
-  const copyright = [
-    "Copyright \xA9",
-    ld.isPartOf.copyrightYear,
-    ld.isPartOf.copyrightHolder.name
-  ].join(" ");
-
   return h("footer", { class: "site" }, [
-    h("ul", { class: "hdot" }, [
-      h("li", {}, copyright),
-      h("li", {}, h("a", { href: "/license/" }, "License")),
-      h("li", {}, h("a", { href: "/privacy/" }, "Privacy Policy"))
-    ])
+    "Copyright \xA9 2019 Chris Wolfe. " +
+      "Licensed under the Apache License, Version 2.0"
   ]);
 }
 
 async function getBreadcrumbs(doc) {
   const routes = getParentDirectories(doc.location.pathname);
-  routes.shift();
+  routes.pop();
 
   return Promise.all(
     routes.map(async route => {

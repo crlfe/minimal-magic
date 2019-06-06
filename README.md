@@ -13,13 +13,15 @@ development server:
 
 ```
 npm i
-node minimal-magic serve examples
+node minimal-magic serve docs
 ```
 
-or compile the examples and look at the output:
+You can view the compiled docs
+<a href="https://crlfe.github.io/minimal-magic">online</a>,
+or build them yourself:
 
 ```
-node minimal-magic build examples
+node minimal-magic build docs
 cat out/index.html
 ```
 
