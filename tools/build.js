@@ -138,11 +138,6 @@ async function compilePage(browser, url, outputFiles) {
     parser: "html"
   });
 
-  // Ensure the document begins with a DOCTYPE.
-  if (!content.startsWith("<!DOCTYPE")) {
-    content = "<!DOCTYPE html>\n" + content;
-  }
-
   // Remove any trailing whitespace and blank lines.
   content = content.replace(/\s+\n/g, "\n");
 
