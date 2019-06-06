@@ -5,7 +5,7 @@
 
 import { h, insertAll } from "/lib/dom.js";
 import { fetchDocument, fetchLinkingData } from "/lib/fetching.js";
-import { getParentDirectories } from "/lib/pathing.js";
+import { getParentDirectories, makeLinksRelative } from "/lib/pathing.js";
 import { addHtmlMetadata } from "/lib/metadata.js";
 
 const SITE = {
@@ -44,6 +44,8 @@ async function setupPage(doc) {
   if (!doc.querySelector("body > footer")) {
     insertAll(doc.body, null, getSiteFooter(doc, ld));
   }
+
+  makeLinksRelative(doc);
 }
 
 function getPageLinkingData(doc) {
