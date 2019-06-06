@@ -128,6 +128,53 @@ async function compilePage(browser, url, outputFiles) {
     document.querySelectorAll("script[data-build]").forEach(script => {
       script.parentNode.removeChild(script);
     });
+
+    removeBlankLines();
+
+    function removeBlankLines() {
+      const REJECT_TAGS = new Set(["SCRIPT", "STYLE"]);
+      const REJECT_WS = new Set(["pre", "pre-wrap"]);
+
+      const walker = document.createTreeWalker(
+        document,
+        NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+        { acceptNode }
+      );
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        while (
+          node.nextSibling &&
+          node.nextSibling.nodeType === Node.TEXT_NODE
+        ) {
+          node.textContent += node.nextSibling.textContent;
+          node.parentNode.removeChild(node.nextSibling);
+        }
+
+        node.textContent = node.textContent.replace(/\s+\n/g, "\n");
+      }
+
+      function acceptNode(node) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          // Entirely ignore special elements like script and style.
+          if (REJECT_TAGS.has(node.tagName)) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          // Entirely ignore elements with CSS white-space like pre.
+          const computed = window.getComputedStyle(node);
+          if (REJECT_WS.has(computed["white-space"])) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          // Process the children of other elements.
+          return NodeFilter.FILTER_SKIP;
+        } else if (node.nodeType === Node.TEXT_NODE) {
+          return NodeFilter.FILTER_ACCEPT;
+        } else {
+          return NodeFilter.FILTER_REJECT;
+        }
+      }
+    }
   });
 
   let content = await page.content();
@@ -138,8 +185,9 @@ async function compilePage(browser, url, outputFiles) {
     parser: "html"
   });
 
-  // Remove any trailing whitespace and blank lines.
-  content = content.replace(/\s+\n/g, "\n");
+  // Remove blank line added by prettier.
+  // TODO: Resolve whether this is an upstream bug.
+  content = content.replace("</head>\n\n", "</head>\n");
 
   // Replace non-ASCII characters with their encoded forms.
   content = content.replace(/[^\n\r\t\x20-\x7F]/g, x => entities.encodeHTML(x));
