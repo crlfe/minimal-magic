@@ -3,42 +3,51 @@
  * @license Apache-2.0
  */
 
-import { h, insertAll } from "./dom-tools.js";
-import { fetchDocument } from "./fetch-tools.js";
+import { h, insertAll } from "/lib/dom-tools.js";
+import { fetchDocument } from "/lib/fetch-tools.js";
+
+const SITE = {
+  copyright: "Copyright \xA9 2019 Chris Wolfe",
+  headline: "Minimal Magic Examples",
+  inLanguage: "en",
+  logo: "/logo.svg"
+};
 
 setupPage(document).catch(console.error);
 
 async function setupPage(doc) {
-  const siteLd = await getSiteLinkingData();
   const pageLd = getPageLinkingData(doc);
   const isRootPage = /^\/(?:index.html)?$/.test(doc.location.pathname);
 
-  doc.documentElement.setAttribute("lang", siteLd.inLanguage);
+  doc.documentElement.setAttribute("lang", SITE.inLanguage);
 
   // Add common metadata (including the title) at the start of the head.
-  insertAll(doc.head, doc.head.firstChild, getHeadPrefix(doc, siteLd, pageLd));
+  insertAll(doc.head, doc.head.firstChild, getHeadPrefix(doc, pageLd));
 
   insertAll(doc.head, null, [
-    h("link", { rel: "stylesheet", href: "/lib/page.css" })
+    h("link", {
+      rel: "stylesheet",
+      href: new URL("layout.css", import.meta.url)
+    })
   ]);
 
   // Add the site header, unless the document already has one.
   if (!doc.querySelector("body > header")) {
     const breadcrumbs = await getBreadcrumbs(doc);
+    const breadcrumbNav =
+      breadcrumbs.length > 0 &&
+      h("nav", {}, [
+        h("ul", { class: "hslash" }, [
+          breadcrumbs.map(crumb =>
+            h("li", {}, h("a", { href: crumb.route }, crumb.name))
+          )
+        ])
+      ]);
+
     insertAll(doc.body, doc.body.firstChild, [
       h("header", { class: "site" }, [
-        h("img", { src: siteLd.image.contentUrl }),
-        h("div", {}, [
-          h("h1", {}, siteLd.headline),
-          breadcrumbs.length > 0 &&
-            h("nav", {}, [
-              h("ul", { class: "hslash" }, [
-                breadcrumbs.map(crumb =>
-                  h("li", {}, h("a", { href: crumb.route }, crumb.name))
-                )
-              ])
-            ])
-        ])
+        h("img", { src: SITE.logo }),
+        h("div", {}, [h("h1", {}, SITE.headline), breadcrumbNav])
       ])
     ]);
   }
@@ -57,16 +66,10 @@ async function setupPage(doc) {
 
   // Add the site footer, unless the document already has one.
   if (!doc.querySelector("body > footer")) {
-    const copyright = [
-      "Copyright \xA9",
-      siteLd.copyrightYear,
-      siteLd.copyrightHolder.name
-    ].join(" ");
-
     insertAll(doc.body, null, [
       h("footer", { class: "site" }, [
         h("ul", { class: "hdot" }, [
-          h("li", {}, copyright),
+          h("li", {}, SITE.copyright),
           h("li", {}, h("a", { href: "/license/" }, "License")),
           h("li", {}, h("a", { href: "/privacy/" }, "Privacy Policy"))
         ])
@@ -80,12 +83,7 @@ function getPageLinkingData(doc) {
   return script ? JSON.parse(script.textContent) : {};
 }
 
-async function getSiteLinkingData() {
-  const home = await fetchDocument("/");
-  return getPageLinkingData(home);
-}
-
-function getHeadPrefix(doc, siteLd, pageLd) {
+function getHeadPrefix(doc, pageLd) {
   // Start with basic metadata.
   const headPrefix = [
     h("meta", { charset: "utf-8" }),
@@ -98,9 +96,7 @@ function getHeadPrefix(doc, siteLd, pageLd) {
   if (!doc.title) {
     // Build a title from the headline of the page (if defined) and site.
     const isRootPage = /^\/(?:index.html)?$/.test(doc.location.pathname);
-    const title = [pageLd.headline, !isRootPage && siteLd.headline]
-      .filter(v => v)
-      .join(" - ");
+    const title = [pageLd.headline, SITE.headline].filter(v => v).join(" - ");
     if (title) {
       headPrefix.push(h("title", {}, title));
     }
