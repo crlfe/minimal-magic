@@ -3,78 +3,53 @@
  * @license Apache-2.0
  */
 
-import { h, insertAll } from "/lib/dom-tools.js";
-import { fetchDocument } from "/lib/fetch-tools.js";
+import { h, insertAll } from "/lib/dom.js";
+import { fetchDocument, fetchLinkingData } from "/lib/fetching.js";
+import { getParentDirectories } from "/lib/pathing.js";
+import { addHtmlMetadata } from "/lib/metadata.js";
 
 const SITE = {
-  copyright: "Copyright \xA9 2019 Chris Wolfe",
+  "@type": "WebSite",
   headline: "Minimal Magic Examples",
   inLanguage: "en",
-  logo: "/logo.svg"
+  image: {
+    "@type": "Image",
+    contentUrl: "/logo.svg"
+  },
+  copyrightHolder: {
+    "@type": "Person",
+    name: "Chris Wolfe"
+  },
+  copyrightYear: 2019
 };
 
 setupPage(document).catch(console.error);
 
 async function setupPage(doc) {
-  const pageLd = getPageLinkingData(doc);
   const isRootPage = /^\/(?:index.html)?$/.test(doc.location.pathname);
 
-  doc.documentElement.setAttribute("lang", SITE.inLanguage);
+  const ld = getPageLinkingData(doc);
+  ld.isPartOf = SITE;
 
-  // Add common metadata (including the title) at the start of the head.
-  insertAll(doc.head, doc.head.firstChild, getHeadPrefix(doc, pageLd));
+  addHtmlMetadata(doc, ld);
 
-  insertAll(doc.head, null, [
-    h("link", {
-      rel: "stylesheet",
-      href: new URL("layout.css", import.meta.url)
-    })
-  ]);
+  const cssHref = new URL("layout.css", import.meta.url).pathname;
+  insertAll(doc.head, null, [h("link", { rel: "stylesheet", href: cssHref })]);
 
-  // Add the site header, unless the document already has one.
   if (!doc.querySelector("body > header")) {
-    const breadcrumbs = await getBreadcrumbs(doc);
-    const breadcrumbNav =
-      breadcrumbs.length > 0 &&
-      h("nav", {}, [
-        h("ul", { class: "hslash" }, [
-          breadcrumbs.map(crumb =>
-            h("li", {}, h("a", { href: crumb.route }, crumb.name))
-          )
-        ])
-      ]);
-
-    insertAll(doc.body, doc.body.firstChild, [
-      h("header", { class: "site" }, [
-        h("img", { src: SITE.logo }),
-        h("div", {}, [h("h1", {}, SITE.headline), breadcrumbNav])
-      ])
-    ]);
+    insertAll(doc.body, doc.body.firstChild, await getSiteHeader(doc, ld));
   }
 
-  // Add the page header, unless the document is the root or already has one.
-  if (!isRootPage && !doc.querySelector("main > header")) {
-    const main = doc.querySelector("main");
-    insertAll(main, main.firstChild, [
-      h("header", { class: "page" }, [
-        h("h2", {}, pageLd.headline),
-        pageLd.datePublished &&
-          h("p", { class: "date" }, formatLongDate(pageLd.datePublished))
-      ])
-    ]);
+  if (!doc.querySelector("main > header")) {
+    // Do not add a page header that repeats the site headline.
+    if (ld.headline !== ld.isPartOf.headline) {
+      const main = doc.querySelector("main");
+      insertAll(main, main.firstChild, getPageHeader(doc, ld));
+    }
   }
 
-  // Add the site footer, unless the document already has one.
   if (!doc.querySelector("body > footer")) {
-    insertAll(doc.body, null, [
-      h("footer", { class: "site" }, [
-        h("ul", { class: "hdot" }, [
-          h("li", {}, SITE.copyright),
-          h("li", {}, h("a", { href: "/license/" }, "License")),
-          h("li", {}, h("a", { href: "/privacy/" }, "Privacy Policy"))
-        ])
-      ])
-    ]);
+    insertAll(doc.body, null, getSiteFooter(doc, ld));
   }
 }
 
@@ -83,53 +58,61 @@ function getPageLinkingData(doc) {
   return script ? JSON.parse(script.textContent) : {};
 }
 
-function getHeadPrefix(doc, pageLd) {
-  // Start with basic metadata.
-  const headPrefix = [
-    h("meta", { charset: "utf-8" }),
-    h("meta", {
-      name: "viewport",
-      content: "width=device-width, initial-scale=1"
-    })
-  ];
+async function getSiteHeader(doc, ld) {
+  const site = ld.isPartOf;
 
-  if (!doc.title) {
-    // Build a title from the headline of the page (if defined) and site.
-    const isRootPage = /^\/(?:index.html)?$/.test(doc.location.pathname);
-    const title = [pageLd.headline, SITE.headline].filter(v => v).join(" - ");
-    if (title) {
-      headPrefix.push(h("title", {}, title));
-    }
-  }
+  const breadcrumbs = await getBreadcrumbs(doc);
+  const breadcrumbNav =
+    breadcrumbs.length > 0 &&
+    h("nav", {}, [
+      h("ul", { class: "hslash" }, [
+        breadcrumbs.map(crumb =>
+          h("li", {}, h("a", { href: crumb.route }, crumb.name))
+        )
+      ])
+    ]);
 
-  if (pageLd.description) {
-    const content = pageLd.description;
-    headPrefix.push(h("meta", { name: "description", content }));
-  }
-  if (pageLd.keywords) {
-    const content = pageLd.keywords;
-    headPrefix.push(h("meta", { name: "keywords", content }));
-  }
-  return headPrefix;
+  return h("header", { class: "site" }, [
+    h("img", { src: site.image.contentUrl, alt: "Example logo" }),
+    h("div", {}, [h("h1", {}, site.headline), breadcrumbNav])
+  ]);
+}
+
+function getPageHeader(doc, ld) {
+  return h("header", { class: "page" }, [
+    h("h2", {}, ld.headline),
+    ld.datePublished &&
+      h("p", { class: "date" }, formatLongDate(ld.datePublished))
+  ]);
+}
+
+function getSiteFooter(doc, ld) {
+  const copyright = [
+    "Copyright \xA9",
+    ld.isPartOf.copyrightYear,
+    ld.isPartOf.copyrightHolder.name
+  ].join(" ");
+
+  return h("footer", { class: "site" }, [
+    h("ul", { class: "hdot" }, [
+      h("li", {}, copyright),
+      h("li", {}, h("a", { href: "/license/" }, "License")),
+      h("li", {}, h("a", { href: "/privacy/" }, "Privacy Policy"))
+    ])
+  ]);
 }
 
 async function getBreadcrumbs(doc) {
-  const routes = [];
-
-  let pathname = doc.location.pathname.replace(/\/index.html$/, "/");
-  while (pathname.length > 1) {
-    pathname = pathname.replace(/[^/]*\/?$/, "");
-    routes.push(pathname);
-  }
+  const routes = getParentDirectories(doc.location.pathname);
+  routes.shift();
 
   return Promise.all(
     routes.map(async route => {
       if (route === "/") {
         return { name: "Home", route };
       } else {
-        const dest = await fetchDocument(route);
-        const destLd = getPageLinkingData(dest);
-        return { name: destLd.headline, route };
+        const ld = await fetchLinkingData(route);
+        return { name: ld.headline, route };
       }
     })
   );
