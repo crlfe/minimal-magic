@@ -57,7 +57,7 @@ export default async function build({ src, out }) {
   // Write files to the output directory.
   for (let [route, content] of outputFiles) {
     const outName = path.join(out, route);
-    if (content == null) {
+    if (content === null) {
       console.log("  copy", route);
       if (route.startsWith("/lib/")) {
         content = await readFilePromise(path.join(__dirname, "..", route));
@@ -81,7 +81,7 @@ async function startLocalServer(src) {
 
   // TODO: Subscribe to the server's error event.
   const server = http.createServer(app);
-  await new Promise((resolve, reject) => {
+  await new Promise(resolve => {
     server.listen(0, "localhost", resolve);
   });
 
@@ -122,7 +122,9 @@ async function compilePage(browser, url, outputFiles) {
     timeout: 10000,
     waitUntil: "networkidle2"
   });
-  await page.evaluate(() => {
+  await page.evaluate(window => {
+    const { document, Node, NodeFilter } = window;
+
     // Remove build-time scripts.
     // TODO: Should we leave an inactive script or comment in the output?
     document.querySelectorAll("script[data-build]").forEach(script => {
@@ -175,7 +177,7 @@ async function compilePage(browser, url, outputFiles) {
         }
       }
     }
-  });
+  }, await page.evaluateHandle("window"));
 
   let content = await page.content();
   await page.close();

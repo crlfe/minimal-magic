@@ -1,10 +1,9 @@
 module.exports = {
-  parserOptions: {
-    ecmaVersion: 2018,
-    sourceType: "module"
-  },
+  extends: "../.eslintrc.js",
   env: {
-    es6: true
+    node: true
   },
-  extends: ["plugin:prettier/recommended"]
+  rules: {
+    "no-console": "off"
+  }
 };
