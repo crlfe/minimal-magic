@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scripts - Minimal Magic</title>
+    <meta name="description" content="Introducing build-time scripts" />
+    <script type="application/ld+json">
+      {
+        "headline": "Scripts",
+        "datePublished": "2019-06-12T18:00:00Z",
+        "description": "Introducing build-time scripts"
+      }
+    </script>
+    <script type="module">
+      const p = document.createElement("p");
+      p.textContent = "This paragraph is added on the client.";
+      document.querySelector("main").appendChild(p);
+    </script>
+    <link rel="stylesheet" href="../../layout.css" />
+  </head>
+  <body>
+    <header class="site">
+      <img src="../../logo.svg" alt="" />
+      <div>
+        <h1>Minimal Magic</h1>
+        <nav>
+          <ul class="hslash">
+            <li><a href="../../">Home</a></li>
+            <li><a href="../">Examples</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+    <main>
+      <header class="page">
+        <h2>Scripts</h2>
+        <p class="date">June 12, 2019</p>
+      </header>
+      <p>This paragraph is added during the build.</p>
+      <p>This paragraph is added on the client.</p>
+    </main>
+    <footer class="site">
+      Copyright &copy; 2019 Chris Wolfe. Licensed under the Apache License, Version
+      2.0
+    </footer>
+  </body>
+</html>

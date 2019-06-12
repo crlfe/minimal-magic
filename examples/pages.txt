@@ -1,0 +1,4 @@
+# This is the master list of examples.
+
+hello/
+scripts/
