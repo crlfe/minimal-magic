@@ -1,0 +1,25 @@
+<html>
+  <head>
+    <script type="application/ld+json">
+      {
+        "headline": "Scripts",
+        "datePublished": "2019-06-12T18:00:00Z",
+        "description": "Introducing build-time scripts"
+      }
+    </script>
+    <script type="module" data-build src="/layout.js"></script>
+    <script type="module" data-build>
+      const p = document.createElement("p");
+      p.textContent = "This paragraph is added during the build.";
+      document.querySelector("main").appendChild(p);
+    </script>
+    <script type="module">
+      const p = document.createElement("p");
+      p.textContent = "This paragraph is added on the client.";
+      document.querySelector("main").appendChild(p);
+    </script>
+  </head>
+  <body>
+    <main></main>
+  </body>
+</html>
