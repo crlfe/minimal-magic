@@ -27,6 +27,13 @@ async function setupPage(doc) {
   const ld = getPageLinkingData(doc);
   ld.isPartOf = SITE;
 
+  // Trailing whitespace outside the body will get merged in.
+  // Remove it to avoid unexpected blank lines in the document.
+  const last = doc.body.lastChild;
+  if (last && last.nodeType === Node.TEXT_NODE) {
+    last.textContent = last.textContent.replace(/\s+$/, "\n");
+  }
+
   addHtmlMetadata(doc, ld);
 
   const cssHref = new URL("layout.css", import.meta.url).pathname;
