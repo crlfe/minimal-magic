@@ -100,9 +100,9 @@ async function compilePage(browser, url, outputFiles) {
     // TODO: Format these better and
     console.log(msg);
   });
-  page.on("response", req => {
-    const url = req.url();
-    if (req.ok() && url.startsWith(baseUrl)) {
+  page.on("response", res => {
+    const url = res.url();
+    if (res.ok() && url.startsWith(baseUrl)) {
       let route = url.slice(baseUrl.length - 1);
       if (route.endsWith("/")) {
         route += "index.html";
@@ -122,62 +122,30 @@ async function compilePage(browser, url, outputFiles) {
     timeout: 10000,
     waitUntil: "networkidle2"
   });
-  await page.evaluate(window => {
+  const window = await page.evaluateHandle("window");
+  await page.evaluate(() => {
     const { document, Node, NodeFilter } = window;
 
     // Remove build-time scripts.
     // TODO: Should we leave an inactive script or comment in the output?
     document.querySelectorAll("script[data-build]").forEach(script => {
-      script.parentNode.removeChild(script);
+      removeNodeAndWhitespace(script);
     });
 
-    removeBlankLines();
-
-    function removeBlankLines() {
-      const REJECT_TAGS = new Set(["SCRIPT", "STYLE"]);
-      const REJECT_WS = new Set(["pre", "pre-wrap"]);
-
-      const walker = document.createTreeWalker(
-        document,
-        NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
-        { acceptNode }
-      );
-      while (walker.nextNode()) {
-        const node = walker.currentNode;
-        while (
-          node.nextSibling &&
-          node.nextSibling.nodeType === Node.TEXT_NODE
-        ) {
-          node.textContent += node.nextSibling.textContent;
-          node.parentNode.removeChild(node.nextSibling);
-        }
-
-        node.textContent = node.textContent.replace(/\s+\n/g, "\n");
+    function removeNodeAndWhitespace(node) {
+      const prev = node.previousSibling;
+      if (prev && prev.nodeType === Node.TEXT_NODE) {
+        prev.textContent = prev.textContent.replace(/[ \t]*$/, "");
       }
 
-      function acceptNode(node) {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          // Entirely ignore special elements like script and style.
-          if (REJECT_TAGS.has(node.tagName)) {
-            return NodeFilter.FILTER_REJECT;
-          }
-
-          // Entirely ignore elements with CSS white-space like pre.
-          const computed = window.getComputedStyle(node);
-          if (REJECT_WS.has(computed["white-space"])) {
-            return NodeFilter.FILTER_REJECT;
-          }
-
-          // Process the children of other elements.
-          return NodeFilter.FILTER_SKIP;
-        } else if (node.nodeType === Node.TEXT_NODE) {
-          return NodeFilter.FILTER_ACCEPT;
-        } else {
-          return NodeFilter.FILTER_REJECT;
-        }
+      const next = node.nextSibling;
+      if (next && next.nodeType === Node.TEXT_NODE) {
+        next.textContent = next.textContent.replace(/^[ \t]*\n/, "");
       }
+
+      node.remove();
     }
-  }, await page.evaluateHandle("window"));
+  });
 
   let content = await page.content();
   await page.close();
