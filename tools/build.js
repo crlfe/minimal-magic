@@ -20,7 +20,7 @@ const readFilePromise = util.promisify(fs.readFile);
 const writeFilePromise = util.promisify(fs.writeFile);
 
 export default async function build({ src, out }) {
-  // TODO: Add sanity checks so that we can automatically delete stale files
+  // TODO(#3): Add sanity checks so that we can automatically delete stale files
   // from the output directory.
 
   const pages = await globPromise("**/*.html", {
@@ -38,7 +38,6 @@ export default async function build({ src, out }) {
 
   const browser = await puppeteer.launch();
 
-  // TODO: May need to limit the number of concurrent pages.
   const outputFiles = new Map();
   await Promise.all(
     pages.map(async name => {
@@ -75,11 +74,11 @@ async function startLocalServer(src) {
   app.use(express.static(src));
   app.use("/lib", express.static(path.resolve(__dirname, "..", "lib")));
 
-  // TODO: Need to disable client-side only scripts. Later (in compilePage)
+  // TODO(#1): Need to disable client-side only scripts. Later (in compilePage)
   // we will massage the HTML to disable compile-time scripts and re-enable the
   // client-side scripts.
 
-  // TODO: Subscribe to the server's error event.
+  // TODO(#2): Subscribe to the server's error event.
   const server = http.createServer(app);
   await new Promise(resolve => {
     server.listen(0, "localhost", resolve);
@@ -97,7 +96,7 @@ async function compilePage(browser, url, outputFiles) {
   const page = await browser.newPage();
   page.on("console", async msg => {
     // Display console log messages.
-    // TODO: Format these better and
+    // TODO(#2): Format these better!
     console.log(msg);
   });
   page.on("response", res => {
@@ -127,7 +126,7 @@ async function compilePage(browser, url, outputFiles) {
     const { document, Node, NodeFilter } = window;
 
     // Remove build-time scripts.
-    // TODO: Should we leave an inactive script or comment in the output?
+    // TODO(#4): Should we leave an inactive script or comment in the output?
     document.querySelectorAll("script[data-build]").forEach(script => {
       removeNodeAndWhitespace(script);
     });
@@ -156,7 +155,7 @@ async function compilePage(browser, url, outputFiles) {
   });
 
   // Remove blank line added by prettier.
-  // TODO: Resolve whether this is an upstream bug.
+  // TODO(#6): Resolve whether this is an upstream bug.
   content = content.replace("</head>\n\n", "</head>\n");
 
   // Replace non-ASCII characters with their encoded forms.
