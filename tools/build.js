@@ -14,15 +14,141 @@ import puppeteer from "puppeteer";
 import prettier from "prettier";
 import util from "util";
 
+import transformResponse from "./transform-response";
+
 const globPromise = util.promisify(glob);
 const mkdirpPromise = util.promisify(mkdirp);
-const readFilePromise = util.promisify(fs.readFile);
+const copyFilePromise = util.promisify(fs.copyFile);
 const writeFilePromise = util.promisify(fs.writeFile);
 
-export default async function build({ src, out }) {
-  // TODO(#3): Add sanity checks so that we can automatically delete stale files
-  // from the output directory.
+class Builder {
+  async start(src) {
+    this.browser = await puppeteer.launch();
+    this.workerPage = await this.browser.newPage();
+    this.workerWindow = await this.workerPage.evaluateHandle("window");
 
+    // TODO(#2): Subscribe to the server's error event.
+    this.server = http.createServer(this._createApp(src));
+    await new Promise(resolve => {
+      this.server.listen(0, "localhost", resolve);
+    });
+
+    const sa = this.server.address();
+    this.url = new URL(`http://${sa.address}:${sa.port}/`);
+  }
+
+  async build(route) {
+    const page = await this.browser.newPage();
+
+    // Collect the list of local files successfully loaded by the page.
+    const loaded = new Set();
+    const baseUrl = this.url.toString();
+    page.on("response", req => {
+      const url = req.url();
+      if (req.ok() && url.startsWith(baseUrl)) {
+        let route = url.slice(baseUrl.length - 1);
+        if (route.endsWith("/")) {
+          route += "index.html";
+        }
+        loaded.add(route);
+      }
+    });
+
+    // Use a large and high-resolution viewport so that captured images will
+    // look decent everywhere.
+    await page.setViewport({
+      width: 1920,
+      height: 1080,
+      deviceScaleFactor: 2
+    });
+
+    // Trigger the page load and wait for all network requests to finish.
+    await page.goto(new URL(route, this.url), {
+      timeout: 10000,
+      waitUntil: "networkidle0"
+    });
+
+    let content = await page.content();
+    await page.close();
+
+    content = await this._finalizeHTML(route, content);
+
+    // Remove blank line added by prettier.
+    // TODO(#6): Resolve whether this is an upstream bug.
+    content = content.replace("</head>\n\n", "</head>\n");
+
+    // Replace non-ASCII characters with their encoded forms.
+    content = content.replace(/[^\n\r\t\x20-\x7E]/g, x =>
+      entities.encodeHTML(x)
+    );
+
+    content = "<!DOCTYPE html>\n" + content;
+
+    return { route, content, loaded };
+  }
+
+  async stop() {
+    if (this.workerPage) {
+      await this.workerPage.close();
+    }
+    if (this.browser) {
+      await this.browser.close();
+    }
+    if (this.server) {
+      this.server.close();
+    }
+
+    Object.assign(this, {
+      browser: null,
+      workerPage: null,
+      workerWindow: null,
+      server: null,
+      url: null
+    });
+  }
+
+  _createApp(src) {
+    const app = express();
+    app.use(
+      transformResponse({
+        filter: req => req.url.endsWith("/") || req.url.endsWith(".html"),
+        transform: (req, res, content) => {
+          return this._prepareHTML(req.url, content.toString());
+        }
+      })
+    );
+    app.use(express.static(src));
+    app.use("/lib", express.static(path.resolve(__dirname, "..", "lib")));
+    return app;
+  }
+
+  async _prepareHTML(route, content) {
+    return await this.workerPage.evaluate(
+      prepareHTMLInBrowser,
+      this.workerWindow,
+      route,
+      content
+    );
+  }
+
+  async _finalizeHTML(route, content) {
+    content = await this.workerPage.evaluate(
+      finalizeHTMLInBrowser,
+      this.workerWindow,
+      route,
+      content
+    );
+
+    content = prettier.format(content, {
+      filepath: route,
+      parser: "html"
+    });
+
+    return content;
+  }
+}
+
+export default async function build({ src, out }) {
   const pages = await globPromise("**/*.html", {
     cwd: src,
     nodir: true,
@@ -34,133 +160,77 @@ export default async function build({ src, out }) {
     return;
   }
 
-  const { server, url } = await startLocalServer(src);
+  const builder = new Builder();
+  await builder.start(src);
 
-  const browser = await puppeteer.launch();
+  const files = new Map();
 
-  const outputFiles = new Map();
+  // Build pages and record any loaded files.
   await Promise.all(
     pages.map(async name => {
-      const route = "/" + name;
-      try {
-        await compilePage(browser, new URL(route, url), outputFiles);
-      } catch (err) {
-        console.log(route, err.message);
+      const page = await builder.build("/" + name);
+      files.set(page.route, true);
+      page.loaded.forEach(file => {
+        if (!files.has(file)) {
+          files.set(file, false);
+        }
+      });
+
+      const outFile = path.join(out, page.route);
+      await mkdirpPromise(path.dirname(outFile));
+      await writeFilePromise(outFile, page.content);
+    })
+  );
+
+  // Copy files that were loaded from the src directory.
+  await Promise.all(
+    Array.from(files).map(async ([route, written]) => {
+      if (!written) {
+        let srcFile;
+        if (route.startsWith("/lib/")) {
+          srcFile = path.join(__dirname, "..", route);
+        } else {
+          srcFile = path.join(src, route);
+        }
+        const outFile = path.join(out, route);
+        await mkdirpPromise(path.dirname(outFile));
+        await copyFilePromise(srcFile, outFile);
       }
     })
   );
 
-  await browser.close();
-  server.close();
+  await builder.stop();
+}
 
-  // Write files to the output directory.
-  for (let [route, content] of outputFiles) {
-    const outName = path.join(out, route);
-    if (content === null) {
-      console.log("  copy", route);
-      if (route.startsWith("/lib/")) {
-        content = await readFilePromise(path.join(__dirname, "..", route));
-      } else {
-        content = await readFilePromise(path.join(src, route));
-      }
+function prepareHTMLInBrowser(window, url, content) {
+  const { DOMParser } = window;
+  const doc = new DOMParser().parseFromString(content, "text/html");
+
+  return doc.documentElement.outerHTML;
+}
+
+function finalizeHTMLInBrowser(window, url, content) {
+  const { DOMParser, Node } = window;
+  const doc = new DOMParser().parseFromString(content, "text/html");
+
+  // TODO(#4): Should we leave an inactive script or comment in the output?
+  doc.querySelectorAll("script[data-build]").forEach(script => {
+    removeNodeAndWhitespace(script);
+  });
+
+  return doc.documentElement.outerHTML;
+
+  function removeNodeAndWhitespace(node) {
+    const prev = node.previousSibling;
+    if (prev && prev.nodeType === Node.TEXT_NODE) {
+      prev.textContent = prev.textContent.replace(/[ \t]*$/, "");
     }
-    await mkdirpPromise(path.dirname(outName));
-    await writeFilePromise(outName, content);
+
+    const next = node.nextSibling;
+    if (next && next.nodeType === Node.TEXT_NODE) {
+      next.textContent = next.textContent.replace(/^[ \t]*\n/, "");
+    }
+
+    node.remove();
   }
-}
-
-async function startLocalServer(src) {
-  const app = express();
-  app.use(express.static(src));
-  app.use("/lib", express.static(path.resolve(__dirname, "..", "lib")));
-
-  // TODO(#1): Need to disable client-side only scripts. Later (in compilePage)
-  // we will massage the HTML to disable compile-time scripts and re-enable the
-  // client-side scripts.
-
-  // TODO(#2): Subscribe to the server's error event.
-  const server = http.createServer(app);
-  await new Promise(resolve => {
-    server.listen(0, "localhost", resolve);
-  });
-
-  const sa = server.address();
-  const url = new URL(`http://${sa.address}:${sa.port}/`);
-
-  return { server, url };
-}
-
-async function compilePage(browser, url, outputFiles) {
-  const baseUrl = new URL("/", url).toString();
-
-  const page = await browser.newPage();
-  page.on("console", async msg => {
-    // Display console log messages.
-    // TODO(#2): Format these better!
-    console.log(msg);
-  });
-  page.on("response", res => {
-    const url = res.url();
-    if (res.ok() && url.startsWith(baseUrl)) {
-      let route = url.slice(baseUrl.length - 1);
-      if (route.endsWith("/")) {
-        route += "index.html";
-      }
-      if (!outputFiles.has(route)) {
-        outputFiles.set(route, null);
-      }
-    }
-  });
-
-  await page.setViewport({
-    width: 1200,
-    height: 1024,
-    deviceScaleFactor: 2
-  });
-  await page.goto(url, {
-    timeout: 10000,
-    waitUntil: "networkidle2"
-  });
-  const window = await page.evaluateHandle("window");
-  await page.evaluate(() => {
-    const { document, Node, NodeFilter } = window;
-
-    // Remove build-time scripts.
-    // TODO(#4): Should we leave an inactive script or comment in the output?
-    document.querySelectorAll("script[data-build]").forEach(script => {
-      removeNodeAndWhitespace(script);
-    });
-
-    function removeNodeAndWhitespace(node) {
-      const prev = node.previousSibling;
-      if (prev && prev.nodeType === Node.TEXT_NODE) {
-        prev.textContent = prev.textContent.replace(/[ \t]*$/, "");
-      }
-
-      const next = node.nextSibling;
-      if (next && next.nodeType === Node.TEXT_NODE) {
-        next.textContent = next.textContent.replace(/^[ \t]*\n/, "");
-      }
-
-      node.remove();
-    }
-  });
-
-  let content = await page.content();
-  await page.close();
-
-  content = prettier.format(content, {
-    filepath: url.pathname,
-    parser: "html"
-  });
-
-  // Remove blank line added by prettier.
-  // TODO(#6): Resolve whether this is an upstream bug.
-  content = content.replace("</head>\n\n", "</head>\n");
-
-  // Replace non-ASCII characters with their encoded forms.
-  content = content.replace(/[^\n\r\t\x20-\x7F]/g, x => entities.encodeHTML(x));
-
-  console.log("  html", url.pathname);
-  outputFiles.set(url.pathname, content);
 }
