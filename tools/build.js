@@ -206,6 +206,16 @@ function prepareHTMLInBrowser(window, url, content) {
   const { DOMParser } = window;
   const doc = new DOMParser().parseFromString(content, "text/html");
 
+  doc.querySelectorAll("script").forEach(script => {
+    // Disable any JavaScript without a data-build attribute.
+    if (!script.hasAttribute("data-build")) {
+      const type = script.getAttribute("type") || "";
+      if (!type || type === "text/javascript" || type === "module") {
+        script.setAttribute("type", "text/plain;real-type=" + type);
+      }
+    }
+  });
+
   return doc.documentElement.outerHTML;
 }
 
@@ -213,9 +223,17 @@ function finalizeHTMLInBrowser(window, url, content) {
   const { DOMParser, Node } = window;
   const doc = new DOMParser().parseFromString(content, "text/html");
 
-  // TODO(#4): Should we leave an inactive script or comment in the output?
-  doc.querySelectorAll("script[data-build]").forEach(script => {
-    removeNodeAndWhitespace(script);
+  doc.querySelectorAll("script").forEach(script => {
+    if (script.hasAttribute("data-build")) {
+      // TODO(#4): Should we leave an inactive script or comment in the output?
+      removeNodeAndWhitespace(script);
+    } else {
+      const type = script.getAttribute("type");
+      const prefix = "text/plain;real-type=";
+      if (type.startsWith(prefix)) {
+        script.setAttribute("type", type.slice(prefix.length));
+      }
+    }
   });
 
   return doc.documentElement.outerHTML;
