@@ -69,6 +69,7 @@ class Builder {
     });
 
     let content = await page.content();
+    const linked = await this._collectLinks(page);
     await page.close();
 
     content = await this._finalizeHTML(route, content);
@@ -84,7 +85,7 @@ class Builder {
 
     content = "<!DOCTYPE html>\n" + content;
 
-    return { route, content, loaded };
+    return { route, content, loaded, linked };
   }
 
   async stop() {
@@ -128,6 +129,13 @@ class Builder {
       this.workerWindow,
       route,
       content
+    );
+  }
+
+  async _collectLinks(page) {
+    return await page.evaluate(
+      collectLinksInBrowser,
+      await page.evaluateHandle("window")
     );
   }
 
@@ -185,10 +193,18 @@ export default async function build({ src, out }) {
     pages.map(async name => {
       const page = await builder.build("/" + name);
       files.set(name, true);
+
       page.loaded.forEach(route => {
         const loadedName = route.slice(1);
         if (!files.has(loadedName)) {
           files.set(loadedName, false);
+        }
+      });
+
+      page.linked.forEach(route => {
+        const linkedName = route.slice(1);
+        if (!files.has(linkedName)) {
+          files.set(linkedName, false);
         }
       });
 
@@ -250,6 +266,38 @@ function prepareHTMLInBrowser(window, url, content) {
   });
 
   return doc.documentElement.outerHTML;
+}
+
+function collectLinksInBrowser(window) {
+  const doc = window.document;
+  const base = doc.location;
+
+  const linked = new Set();
+
+  doc.querySelectorAll("*[href]").forEach(element => {
+    maybeAddLink(element.getAttribute("href"));
+  });
+
+  doc.querySelectorAll("*[src]").forEach(element => {
+    maybeAddLink(element.getAttribute("src"));
+  });
+
+  // TODO: Add srcset parsing. Other elements?
+  // TODO: Check that linked files actually exist (and are not directories).
+
+  // Set does not appear to serialize from puppeteer, so convert to an array.
+  return Array.from(linked);
+
+  function maybeAddLink(relative) {
+    const url = new URL(relative, base);
+    if (url.origin === base.origin) {
+      let route = url.pathname;
+      if (route.endsWith("/")) {
+        route += "index.html";
+      }
+      linked.add(route);
+    }
+  }
 }
 
 function finalizeHTMLInBrowser(window, url, content) {
