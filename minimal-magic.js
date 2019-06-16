@@ -15,7 +15,7 @@ const toolsDir = path.resolve(__dirname, "tools");
 // Add Babel to support import/export.
 require("@babel/register")({
   only: [pathname => pathname.startsWith(toolsDir)],
-  plugins: ["@babel/plugin-transform-modules-commonjs"]
+  plugins: [require("@babel/plugin-transform-modules-commonjs").default]
 });
 
 // Execute the main function allowing async.
