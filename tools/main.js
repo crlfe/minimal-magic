@@ -32,7 +32,7 @@ Usage: minimal-magic build [OPTION]... [SRC]
 Builds a production version of the website in SRC (default "./src")
 
 Options:
-  --out=PATH    (default "./out")
+  --out=PATH     (default "./out")
 `;
 
 const SERVE_HELP_MESSAGE = `\

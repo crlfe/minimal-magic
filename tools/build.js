@@ -149,6 +149,19 @@ class Builder {
 }
 
 export default async function build({ src, out }) {
+  src = path.resolve(src) + "/";
+  out = path.resolve(out) + "/";
+
+  if (src.startsWith(out)) {
+    console.error(
+      "Safety check failed: The output directory contains the source!\n" +
+        `  source: ${src}\n` +
+        `  output: ${out}\n`
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   const pages = await globPromise("**/*.html", {
     cwd: src,
     nodir: true,
@@ -163,20 +176,23 @@ export default async function build({ src, out }) {
   const builder = new Builder();
   await builder.start(src);
 
+  // File names relative to either the src or out directories.
+  // These do not have a leading slash (routes used in the builder do).
   const files = new Map();
 
   // Build pages and record any loaded files.
   await Promise.all(
     pages.map(async name => {
       const page = await builder.build("/" + name);
-      files.set(page.route, true);
-      page.loaded.forEach(file => {
-        if (!files.has(file)) {
-          files.set(file, false);
+      files.set(name, true);
+      page.loaded.forEach(route => {
+        const loadedName = route.slice(1);
+        if (!files.has(loadedName)) {
+          files.set(loadedName, false);
         }
       });
 
-      const outFile = path.join(out, page.route);
+      const outFile = path.join(out, name);
       await mkdirpPromise(path.dirname(outFile));
       await writeFilePromise(outFile, page.content);
     })
@@ -187,7 +203,7 @@ export default async function build({ src, out }) {
     Array.from(files).map(async ([route, written]) => {
       if (!written) {
         let srcFile;
-        if (route.startsWith("/lib/")) {
+        if (route.startsWith("lib/")) {
           srcFile = path.join(__dirname, "..", route);
         } else {
           srcFile = path.join(src, route);
@@ -198,6 +214,20 @@ export default async function build({ src, out }) {
       }
     })
   );
+
+  // Warn about unexpected (and possibly stale) files in the out directory.
+  // For simplicity this ignores dot-files (like .git) and directories.
+  const unknownFiles = (await globPromise("**/*", {
+    cwd: out,
+    nodir: true,
+    nosort: true
+  })).filter(file => !files.has(file));
+  if (unknownFiles.length) {
+    console.warn(
+      `The output directory contains some unexpected files:\n` +
+        unknownFiles.map(file => `  ${file}\n`).join("")
+    );
+  }
 
   await builder.stop();
 }
