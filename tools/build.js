@@ -192,6 +192,7 @@ export default async function build({ src, out }) {
         }
       });
 
+      console.log("  html", name);
       const outFile = path.join(out, name);
       await mkdirpPromise(path.dirname(outFile));
       await writeFilePromise(outFile, page.content);
@@ -200,15 +201,17 @@ export default async function build({ src, out }) {
 
   // Copy files that were loaded from the src directory.
   await Promise.all(
-    Array.from(files).map(async ([route, written]) => {
+    Array.from(files).map(async ([name, written]) => {
       if (!written) {
         let srcFile;
-        if (route.startsWith("lib/")) {
-          srcFile = path.join(__dirname, "..", route);
+        if (name.startsWith("lib/")) {
+          srcFile = path.join(__dirname, "..", name);
         } else {
-          srcFile = path.join(src, route);
+          srcFile = path.join(src, name);
         }
-        const outFile = path.join(out, route);
+
+        console.log("  copy", name);
+        const outFile = path.join(out, name);
         await mkdirpPromise(path.dirname(outFile));
         await copyFilePromise(srcFile, outFile);
       }
