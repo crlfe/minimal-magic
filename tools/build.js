@@ -256,7 +256,7 @@ function prepareHTMLInBrowser(window, url, content) {
   const doc = new DOMParser().parseFromString(content, "text/html");
 
   doc.querySelectorAll("script").forEach(script => {
-    // Disable any JavaScript without a data-build attribute.
+    // Disable any client-side JavaScript.
     if (!script.hasAttribute("data-build")) {
       const type = script.getAttribute("type") || "";
       if (!type || type === "text/javascript" || type === "module") {
@@ -282,7 +282,14 @@ function collectLinksInBrowser(window) {
     maybeAddLink(element.getAttribute("src"));
   });
 
-  // TODO: Add srcset parsing. Other elements?
+  doc.querySelectorAll("*[srcset]").forEach(element => {
+    const parts = element.getAttribute("srcset").split(",");
+    parts.forEach(src => {
+      maybeAddLink(src.split(/\s+/)[0]);
+    });
+  });
+
+  // TODO: Other elements?
   // TODO: Check that linked files actually exist (and are not directories).
 
   // Set does not appear to serialize from puppeteer, so convert to an array.
@@ -304,16 +311,18 @@ function finalizeHTMLInBrowser(window, url, content) {
   const { DOMParser, Node } = window;
   const doc = new DOMParser().parseFromString(content, "text/html");
 
+  // Remove elements with the data-build attribute.
+  doc.querySelectorAll("*[data-build]").forEach(element => {
+    // TODO(#4): Should we leave a comment in the output?
+    removeNodeAndWhitespace(element);
+  });
+
+  // Re-enable client-side JavaScript.
   doc.querySelectorAll("script").forEach(script => {
-    if (script.hasAttribute("data-build")) {
-      // TODO(#4): Should we leave an inactive script or comment in the output?
-      removeNodeAndWhitespace(script);
-    } else {
-      const type = script.getAttribute("type");
-      const prefix = "text/plain;real-type=";
-      if (type.startsWith(prefix)) {
-        script.setAttribute("type", type.slice(prefix.length));
-      }
+    const type = script.getAttribute("type");
+    const prefix = "text/plain;real-type=";
+    if (type.startsWith(prefix)) {
+      script.setAttribute("type", type.slice(prefix.length));
     }
   });
 

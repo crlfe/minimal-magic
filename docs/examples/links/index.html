@@ -1,0 +1,58 @@
+<html>
+  <head>
+    <script type="application/ld+json">
+      {
+        "headline": "Links",
+        "datePublished": "2019-06-12T18:00:00Z",
+        "description": "Linked resources are automatically copied"
+      }
+    </script>
+    <script type="module" data-build src="/layout.js"></script>
+  </head>
+  <body>
+    <main>
+      <p><a href="link.txt">A link to a text file</a>.</p>
+      <figure>
+        <picture>
+          <source srcset="image.svg" type="image/svg+xml" />
+          <img srcset="image-2x.png 2x" src="image.png" />
+        </picture>
+        <figcaption>
+          Example image: red and blue rectangles in a black border.
+          <!-- TODO: Add build-time code to generate the PNG versions. -->
+        </figcaption>
+      </figure>
+      <figure>
+        <audio controls preload="none">
+          <source src="audio.mp3" type="audio/mpeg" />
+          <track
+            src="audio.vtt"
+            kind="captions"
+            srclang="en"
+            label="English Captions"
+          />
+          <a href="audio.mp3">Play the sound</a>
+        </audio>
+        <figcaption>
+          Example audio: five seconds of silence.
+          <!-- TODO: Generate a transcript from the captions, or vice versa. -->
+        </figcaption>
+      </figure>
+      <figure>
+        <video controls preload="none">
+          <source src="video.mp4" type="video/mp4" />
+          <track
+            src="video.vtt"
+            kind="captions"
+            srclang="en"
+            label="English Captions"
+          />
+        </video>
+        <figcaption>
+          Example video: solid red background and five seconds of silence.
+          <!-- TODO: Generate a transcript from the captions, or vice versa. -->
+        </figcaption>
+      </figure>
+    </main>
+  </body>
+</html>
