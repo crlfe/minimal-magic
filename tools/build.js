@@ -57,20 +57,6 @@ class Builder {
 
     const page = await this.browser.newPage();
 
-    // Collect the list of local files successfully loaded by the page.
-    const loaded = new Set();
-    const baseUrl = this.url.toString();
-    page.on("response", req => {
-      const url = req.url();
-      if (req.ok() && url.startsWith(baseUrl)) {
-        let route = url.slice(baseUrl.length - 1);
-        if (route.endsWith("/")) {
-          route += "index.html";
-        }
-        loaded.add(route);
-      }
-    });
-
     // Use a large and high-resolution viewport so that captured images will
     // look decent everywhere.
     await page.setViewport({
@@ -102,7 +88,7 @@ class Builder {
 
     content = "<!DOCTYPE html>\n" + content;
 
-    return { route, content, loaded, linked };
+    return { route, content, linked };
   }
 
   async stop() {
@@ -236,18 +222,11 @@ export default async function build({ src, out }) {
   // These do not have a leading slash (routes used in the builder do).
   const files = new Map();
 
-  // Build pages and record any loaded files.
+  // Build pages and record any linked files.
   await Promise.all(
     pages.map(async name => {
       const page = await builder.build("/" + name);
       files.set(name, true);
-
-      page.loaded.forEach(route => {
-        const loadedName = route.slice(1);
-        if (!files.has(loadedName)) {
-          files.set(loadedName, false);
-        }
-      });
 
       page.linked.forEach(route => {
         const linkedName = route.slice(1);
@@ -263,7 +242,7 @@ export default async function build({ src, out }) {
     })
   );
 
-  // Copy files that were loaded from the src directory.
+  // Copy files from the src directory.
   await Promise.all(
     Array.from(files).map(async ([name, written]) => {
       if (!written) {
@@ -339,24 +318,30 @@ function collectLinksInBrowser(window) {
   doc.querySelectorAll("*[href]").forEach(
     /** @param {Element} element */
     element => {
-      maybeAddLink(element.getAttribute("href") || "");
+      if (!element.hasAttribute("data-build")) {
+        maybeAddLink(element.getAttribute("href") || "");
+      }
     }
   );
 
   doc.querySelectorAll("*[src]").forEach(
     /** @param {Element} element */
     element => {
-      maybeAddLink(element.getAttribute("src") || "");
+      if (!element.hasAttribute("data-build")) {
+        maybeAddLink(element.getAttribute("src") || "");
+      }
     }
   );
 
   doc.querySelectorAll("*[srcset]").forEach(
     /** @param {Element} element */
     element => {
-      const parts = (element.getAttribute("srcset") || "").split(",");
-      parts.forEach(src => {
-        maybeAddLink(src.split(/\s+/)[0]);
-      });
+      if (!element.hasAttribute("data-build")) {
+        const parts = (element.getAttribute("srcset") || "").split(",");
+        parts.forEach(src => {
+          maybeAddLink(src.split(/\s+/)[0]);
+        });
+      }
     }
   );
 
