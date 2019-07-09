@@ -26,11 +26,17 @@ const writeFilePromise = util.promisify(fs.writeFile);
 class Builder {
   /**
    * @param {string} src
+   * @returns {Promise<void>}
    */
   async start(src) {
     this.browser = await puppeteer.launch();
     this.workerPage = await this.browser.newPage();
     this.workerWindow = await this.workerPage.evaluateHandle("window");
+
+    // TODO: Also fail the build on warning and error logs.
+    this.workerPage.on("console", msg => {
+      console.log(`${src} ${msg.type()}: ${msg.text()}`);
+    });
 
     // TODO(#2): Subscribe to the server's error event.
     const server = http.createServer(this._createApp(src));
@@ -44,14 +50,22 @@ class Builder {
     if (!sa || typeof sa === "string") {
       throw new TypeError("Failed to determine server address");
     }
-    this.url = new URL(`http://${sa.address}:${sa.port}/`);
+    this.serverUrl = new URL(`http://${sa.address}:${sa.port}/`);
   }
 
   /**
+   * @typedef {object} BuildResult
+   * @property {string} route
+   * @property {string} content
+   * @property {Array<string>} linked
+   */
+
+  /**
    * @param {string} route
+   * @returns {Promise<BuildResult>}
    */
   async build(route) {
-    if (!this.browser || !this.url) {
+    if (!this.browser || !this.serverUrl) {
       throw new TypeError("Not started");
     }
 
@@ -65,17 +79,19 @@ class Builder {
       deviceScaleFactor: 2
     });
 
+    const pageUrl = new URL(route, this.serverUrl);
+
     // Trigger the page load and wait for all network requests to finish.
-    await page.goto(new URL(route, this.url).href, {
+    await page.goto(pageUrl.href, {
       timeout: 10000,
       waitUntil: "networkidle0"
     });
 
     let content = await page.content();
-    const linked = await this._collectLinks(page);
     await page.close();
 
-    content = await this._finalizeHTML(route, content);
+    let linked;
+    ({ content, linked } = await this._finalizeHTML(pageUrl, content));
 
     // Remove blank line added by prettier.
     // TODO(#6): Resolve whether this is an upstream bug.
@@ -91,6 +107,9 @@ class Builder {
     return { route, content, linked };
   }
 
+  /**
+   * @returns {Promise<void>}
+   */
   async stop() {
     if (this.workerPage) {
       await this.workerPage.close();
@@ -107,21 +126,24 @@ class Builder {
       workerPage: null,
       workerWindow: null,
       server: null,
-      url: null
+      serverUrl: null
     });
   }
 
   /**
    * @private
    * @param {string} src
+   * @returns {express.Express}
    */
   _createApp(src) {
     const app = express();
     app.use(
       transformResponse({
         filter: req => req.url.endsWith("/") || req.url.endsWith(".html"),
-        transform: (req, res, content) => {
-          return this._prepareHTML(req.url, content.toString());
+        transform: async (req, res, content) => {
+          return Buffer.from(
+            await this._prepareHTML(req.url, content.toString())
+          );
         }
       })
     );
@@ -134,6 +156,7 @@ class Builder {
    * @private
    * @param {string} route
    * @param {string} content
+   * @returns {Promise<string>}
    */
   async _prepareHTML(route, content) {
     if (!this.workerPage || !this.workerWindow) {
@@ -150,38 +173,29 @@ class Builder {
 
   /**
    * @private
-   * @param {puppeteer.Page} page
-   */
-  async _collectLinks(page) {
-    return await page.evaluate(
-      collectLinksInBrowser,
-      await page.evaluateHandle("window")
-    );
-  }
-
-  /**
-   * @private
-   * @param {string} route
+   * @param {URL} pageUrl
    * @param {string} content
+   * @returns {Promise<{content:string, linked: Array<string>}>}
    */
-  async _finalizeHTML(route, content) {
+  async _finalizeHTML(pageUrl, content) {
     if (!this.workerPage || !this.workerWindow) {
       throw new TypeError("Not started");
     }
 
-    content = await this.workerPage.evaluate(
+    let linked;
+    ({ content, linked } = await this.workerPage.evaluate(
       finalizeHTMLInBrowser,
       this.workerWindow,
-      route,
+      pageUrl.toString(),
       content
-    );
+    ));
 
     content = prettier.format(content, {
-      filepath: route,
+      filepath: pageUrl.pathname,
       parser: "html"
     });
 
-    return content;
+    return { content, linked };
   }
 }
 
@@ -189,6 +203,7 @@ class Builder {
  * @param {object} $0
  * @param {string} $0.src
  * @param {string} $0.out
+ * @returns {Promise<void>}
  */
 export default async function build({ src, out }) {
   src = path.resolve(src) + "/";
@@ -283,6 +298,7 @@ export default async function build({ src, out }) {
  * @param {WindowExt} window
  * @param {string} url
  * @param {string} content
+ * @returns {string}
  */
 function prepareHTMLInBrowser(window, url, content) {
   const { DOMParser } = window;
@@ -305,75 +321,14 @@ function prepareHTMLInBrowser(window, url, content) {
 }
 
 /**
- * @private
  * @param {WindowExt} window
- */
-function collectLinksInBrowser(window) {
-  const doc = window.document;
-  const base = new URL(doc.location.href);
-  console.log({ base });
-
-  const linked = new Set();
-
-  doc.querySelectorAll("*[href]").forEach(
-    /** @param {Element} element */
-    element => {
-      if (!element.hasAttribute("data-build")) {
-        maybeAddLink(element.getAttribute("href") || "");
-      }
-    }
-  );
-
-  doc.querySelectorAll("*[src]").forEach(
-    /** @param {Element} element */
-    element => {
-      if (!element.hasAttribute("data-build")) {
-        maybeAddLink(element.getAttribute("src") || "");
-      }
-    }
-  );
-
-  doc.querySelectorAll("*[srcset]").forEach(
-    /** @param {Element} element */
-    element => {
-      if (!element.hasAttribute("data-build")) {
-        const parts = (element.getAttribute("srcset") || "").split(",");
-        parts.forEach(src => {
-          maybeAddLink(src.split(/\s+/)[0]);
-        });
-      }
-    }
-  );
-
-  // TODO: Other elements?
-  // TODO: Check that linked files actually exist (and are not directories).
-
-  // Set does not appear to serialize from puppeteer, so convert to an array.
-  return Array.from(linked);
-
-  /**
-   * @private
-   * @param {string} relative
-   */
-  function maybeAddLink(relative) {
-    const url = new URL(relative, base);
-    if (url.origin === base.origin) {
-      let route = url.pathname;
-      if (route.endsWith("/")) {
-        route += "index.html";
-      }
-      linked.add(route);
-    }
-  }
-}
-
-/**
- * @param {WindowExt} window
- * @param {string} url
+ * @param {string} pageUrlHref
  * @param {string} content
+ * @returns {{content: string, linked: Array<string>}}
  */
-function finalizeHTMLInBrowser(window, url, content) {
+function finalizeHTMLInBrowser(window, pageUrlHref, content) {
   const { DOMParser, Node } = window;
+  const pageUrl = new URL(pageUrlHref);
   const doc = new DOMParser().parseFromString(content, "text/html");
 
   // Remove elements with the data-build attribute.
@@ -397,11 +352,14 @@ function finalizeHTMLInBrowser(window, url, content) {
     }
   );
 
-  return doc.documentElement.outerHTML;
+  const linked = collectLinksInBrowser(doc);
+
+  return { content: doc.documentElement.outerHTML, linked };
 
   /**
    * @private
    * @param {Node} node
+   * @returns {void}
    */
   function removeNodeAndWhitespace(node) {
     const prev = node.previousSibling;
@@ -415,5 +373,61 @@ function finalizeHTMLInBrowser(window, url, content) {
     }
 
     node.remove();
+  }
+
+  /**
+   * @private
+   * @param {Document} doc
+   * @returns {Array<string>}
+   */
+  function collectLinksInBrowser(doc) {
+    const linked = new Set();
+
+    doc.querySelectorAll("*[href]").forEach(
+      /** @param {Element} element */
+      element => {
+        maybeAddLink(element.getAttribute("href") || "", pageUrl);
+      }
+    );
+
+    doc.querySelectorAll("*[src]").forEach(
+      /** @param {Element} element */
+      element => {
+        maybeAddLink(element.getAttribute("src") || "", pageUrl);
+      }
+    );
+
+    doc.querySelectorAll("*[srcset]").forEach(
+      /** @param {Element} element */
+      element => {
+        const parts = (element.getAttribute("srcset") || "").split(",");
+        parts.forEach(src => {
+          maybeAddLink(src.split(/\s+/)[0], pageUrl);
+        });
+      }
+    );
+
+    /**
+     * @private
+     * @param {string} relative
+     * @param {URL} pageUrl
+     * @returns {void}
+     */
+    function maybeAddLink(relative, pageUrl) {
+      const url = new URL(relative, pageUrl);
+      if (url.origin === pageUrl.origin) {
+        let route = url.pathname;
+        if (route.endsWith("/")) {
+          route += "index.html";
+        }
+        linked.add(route);
+      }
+    }
+
+    // TODO: Other elements?
+    // TODO: Check that linked files actually exist (and are not directories).
+
+    // Set can not be serialized in puppeteer so convert to an array.
+    return Array.from(linked);
   }
 }
