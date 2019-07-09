@@ -1,5 +1,5 @@
 module.exports = {
-  extends: ["../.eslintrc.js", "plugin:compat/recommended"],
+  extends: ["./eslint-common.js", "plugin:compat/recommended"],
   env: {
     browser: true
   },

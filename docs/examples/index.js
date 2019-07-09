@@ -5,18 +5,25 @@ import { makeRelative } from "/lib/pathing.js";
 main().catch(console.error);
 
 async function main() {
-  const urls = await fetchURLs(new URL("pages.txt", document.location.href));
+  const base = new URL(document.location.href);
+  const urls = await fetchURLs(new URL("pages.txt", base));
   const docs = await Promise.all(
-    urls.map(async url => [url, await fetchLinkingData(url)])
+    urls.map(
+      /** @param {URL} url */
+      async url => [url, await fetchLinkingData(url)]
+    )
   );
 
-  insertAll(document.getElementById("examples-list"), null, [
-    docs.map(([url, ld]) => {
-      const href = makeRelative(url, document.location);
-      return h("li", {}, [
-        h("a", { href }, ld.headline),
-        h("p", {}, ld.description)
-      ]);
-    })
-  ]);
+  const target = document.getElementById("examples-list");
+  if (target) {
+    insertAll(target, null, [
+      docs.map(([url, ld]) => {
+        const href = makeRelative(url, base);
+        return h("li", {}, [
+          h("a", { href }, ld.headline),
+          h("p", {}, ld.description)
+        ]);
+      })
+    ]);
+  }
 }

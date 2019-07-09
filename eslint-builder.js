@@ -1,6 +1,7 @@
 module.exports = {
-  extends: "../.eslintrc.js",
+  extends: "./eslint-common.js",
   env: {
+    browser: true,
     node: true
   },
   rules: {

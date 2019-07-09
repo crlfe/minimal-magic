@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": true,
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "lib": ["dom", "es2017"],
+    "baseUrl": "./",
+    "paths": {
+      "/*": ["./*"]
+    }
+  },
+  "include": ["docs/**/*.js", "lib/**/*.js", "tools/**/*.js", "tools/**/*.ts"]
+}

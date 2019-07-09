@@ -62,10 +62,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 `;
 
+/**
+ * @param {string[]} argv
+ */
 export default async function main(argv) {
   const usageError = genericUsageError.bind(null, ["minimal-magic"]);
 
-  const [options, operands] = parseArgs(argv.slice(2));
+  const { options, operands } = parseArgs(argv.slice(2));
   const command = operands.shift();
 
   if (command === "help" || (!command && options.help)) {
@@ -83,6 +86,10 @@ export default async function main(argv) {
   }
 }
 
+/**
+ * @param {object} options
+ * @param {string[]} operands
+ */
 async function doBuild(options, operands) {
   const usageError = genericUsageError.bind(null, ["minimal-magic", "build"]);
 
@@ -116,6 +123,10 @@ async function doBuild(options, operands) {
   await buildCommand({ src, out });
 }
 
+/**
+ * @param {object} options
+ * @param {string[]} operands
+ */
 async function doServe(options, operands) {
   const usageError = genericUsageError.bind(null, ["minimal-magic", "serve"]);
 
@@ -151,6 +162,10 @@ async function doServe(options, operands) {
   await serveCommand({ src, host, port });
 }
 
+/**
+ * @param {string[]} context
+ * @param {string} message
+ */
 function genericUsageError(context, message) {
   console.error(
     [
@@ -161,11 +176,21 @@ function genericUsageError(context, message) {
   process.exitCode = 2;
 }
 
+/**
+ * @param {string} message
+ * @param {Error} err
+ */
 function fatalError(message, err) {
   console.error(message + ":\n  " + err.message.replace(/\n/g, "\n  "));
   process.exitCode = 1;
 }
 
+/**
+ * @param {string} src
+ * @param {object} $1
+ * @param {(message: string) => void} $1.usageError
+ * @param {(message: string, err: Error) => void} $1.fatalError
+ */
 function checkSourceDirectory(src, { usageError, fatalError }) {
   try {
     const srcStats = fs.statSync(src);
@@ -188,6 +213,12 @@ function checkSourceDirectory(src, { usageError, fatalError }) {
   }
 }
 
+/**
+ * @param {string} out
+ * @param {object} $1
+ * @param {(message: string) => void} $1.usageError
+ * @param {(message: string, err: Error) => void} $1.fatalError
+ */
 async function ensureOutputDirectory(out, { usageError, fatalError }) {
   try {
     const outStats = fs.statSync(out);
@@ -218,7 +249,12 @@ async function ensureOutputDirectory(out, { usageError, fatalError }) {
   }
 }
 
+/**
+ * @param {string[]} args
+ * @returns {{options: object, operands: string[]}}
+ */
 function parseArgs(args) {
+  /** @type {object} */
   const options = {};
   const operands = [];
 
@@ -240,5 +276,5 @@ function parseArgs(args) {
       operands.push(arg);
     }
   }
-  return [options, operands];
+  return { options, operands };
 }

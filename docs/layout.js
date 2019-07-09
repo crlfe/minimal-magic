@@ -21,6 +21,9 @@ const SITE = {
 
 setupPage(document).catch(console.error);
 
+/**
+ * @param {Document} doc
+ */
 async function setupPage(doc) {
   const isRootPage = /^\/(?:index.html)?$/.test(doc.location.pathname);
 
@@ -31,7 +34,7 @@ async function setupPage(doc) {
   // Remove it to avoid unexpected blank lines in the document.
   const last = doc.body.lastChild;
   if (last && last.nodeType === Node.TEXT_NODE) {
-    last.textContent = last.textContent.replace(/\s+$/, "\n");
+    last.textContent = (last.textContent || "").replace(/\s+$/, "\n");
   }
 
   addHtmlMetadata(doc, ld);
@@ -45,7 +48,9 @@ async function setupPage(doc) {
 
   if (!doc.querySelector("main > header") && !isRootPage) {
     const main = doc.querySelector("main");
-    insertAll(main, main.firstChild, getPageHeader(doc, ld));
+    if (main) {
+      insertAll(main, main.firstChild, getPageHeader(doc, ld));
+    }
   }
 
   if (!doc.querySelector("body > footer")) {
@@ -55,11 +60,18 @@ async function setupPage(doc) {
   makeLinksRelative(doc);
 }
 
+/**
+ * @param {Document} doc
+ */
 function getPageLinkingData(doc) {
   const script = doc.head.querySelector('script[type="application/ld+json"]');
-  return script ? JSON.parse(script.textContent) : {};
+  return script ? JSON.parse(script.textContent || "{}") : {};
 }
 
+/**
+ * @param {Document} doc
+ * @param {object} ld
+ */
 async function getSiteHeader(doc, ld) {
   const site = ld.isPartOf;
 
@@ -80,6 +92,10 @@ async function getSiteHeader(doc, ld) {
   ]);
 }
 
+/**
+ * @param {Document} doc
+ * @param {object} ld
+ */
 function getPageHeader(doc, ld) {
   return h("header", { class: "page" }, [
     h("h2", {}, ld.headline),
@@ -88,6 +104,10 @@ function getPageHeader(doc, ld) {
   ]);
 }
 
+/**
+ * @param {Document} doc
+ * @param {object} ld
+ */
 function getSiteFooter(doc, ld) {
   return h("footer", { class: "site" }, [
     "Copyright \xA9 2019 Chris Wolfe. " +
@@ -95,6 +115,9 @@ function getSiteFooter(doc, ld) {
   ]);
 }
 
+/**
+ * @param {Document} doc
+ */
 async function getBreadcrumbs(doc) {
   const routes = getParentDirectories(doc.location.pathname);
   routes.pop();
@@ -111,6 +134,9 @@ async function getBreadcrumbs(doc) {
   );
 }
 
+/**
+ * @param {string} source
+ */
 function formatLongDate(source) {
   return new Date(source).toLocaleDateString("en", {
     timeZone: "UTC",

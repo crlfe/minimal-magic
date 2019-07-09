@@ -1,6 +1,8 @@
 /**
  * @author Chris Wolfe
  * @license Apache-2.0
+ *
+ * @typedef {Window & { DOMParser: any; Node: any; }} WindowExt
  */
 
 import entities from "entities";
@@ -22,22 +24,37 @@ const copyFilePromise = util.promisify(fs.copyFile);
 const writeFilePromise = util.promisify(fs.writeFile);
 
 class Builder {
+  /**
+   * @param {string} src
+   */
   async start(src) {
     this.browser = await puppeteer.launch();
     this.workerPage = await this.browser.newPage();
     this.workerWindow = await this.workerPage.evaluateHandle("window");
 
     // TODO(#2): Subscribe to the server's error event.
-    this.server = http.createServer(this._createApp(src));
+    const server = http.createServer(this._createApp(src));
     await new Promise(resolve => {
-      this.server.listen(0, "localhost", resolve);
+      server.listen(0, "localhost", resolve);
     });
 
-    const sa = this.server.address();
+    this.server = server;
+
+    const sa = server.address();
+    if (!sa || typeof sa === "string") {
+      throw new TypeError("Failed to determine server address");
+    }
     this.url = new URL(`http://${sa.address}:${sa.port}/`);
   }
 
+  /**
+   * @param {string} route
+   */
   async build(route) {
+    if (!this.browser || !this.url) {
+      throw new TypeError("Not started");
+    }
+
     const page = await this.browser.newPage();
 
     // Collect the list of local files successfully loaded by the page.
@@ -63,7 +80,7 @@ class Builder {
     });
 
     // Trigger the page load and wait for all network requests to finish.
-    await page.goto(new URL(route, this.url), {
+    await page.goto(new URL(route, this.url).href, {
       timeout: 10000,
       waitUntil: "networkidle0"
     });
@@ -108,6 +125,10 @@ class Builder {
     });
   }
 
+  /**
+   * @private
+   * @param {string} src
+   */
   _createApp(src) {
     const app = express();
     app.use(
@@ -123,7 +144,16 @@ class Builder {
     return app;
   }
 
+  /**
+   * @private
+   * @param {string} route
+   * @param {string} content
+   */
   async _prepareHTML(route, content) {
+    if (!this.workerPage || !this.workerWindow) {
+      throw new TypeError("Not started");
+    }
+
     return await this.workerPage.evaluate(
       prepareHTMLInBrowser,
       this.workerWindow,
@@ -132,6 +162,10 @@ class Builder {
     );
   }
 
+  /**
+   * @private
+   * @param {puppeteer.Page} page
+   */
   async _collectLinks(page) {
     return await page.evaluate(
       collectLinksInBrowser,
@@ -139,7 +173,16 @@ class Builder {
     );
   }
 
+  /**
+   * @private
+   * @param {string} route
+   * @param {string} content
+   */
   async _finalizeHTML(route, content) {
+    if (!this.workerPage || !this.workerWindow) {
+      throw new TypeError("Not started");
+    }
+
     content = await this.workerPage.evaluate(
       finalizeHTMLInBrowser,
       this.workerWindow,
@@ -156,6 +199,11 @@ class Builder {
   }
 }
 
+/**
+ * @param {object} $0
+ * @param {string} $0.src
+ * @param {string} $0.out
+ */
 export default async function build({ src, out }) {
   src = path.resolve(src) + "/";
   out = path.resolve(out) + "/";
@@ -251,43 +299,66 @@ export default async function build({ src, out }) {
   await builder.stop();
 }
 
+/**
+ * @private
+ * @param {WindowExt} window
+ * @param {string} url
+ * @param {string} content
+ */
 function prepareHTMLInBrowser(window, url, content) {
   const { DOMParser } = window;
   const doc = new DOMParser().parseFromString(content, "text/html");
 
-  doc.querySelectorAll("script").forEach(script => {
-    // Disable any client-side JavaScript.
-    if (!script.hasAttribute("data-build")) {
-      const type = script.getAttribute("type") || "";
-      if (!type || type === "text/javascript" || type === "module") {
-        script.setAttribute("type", "text/plain;real-type=" + type);
+  doc.querySelectorAll("script").forEach(
+    /** @param {Element} script */
+    script => {
+      // Disable any client-side JavaScript.
+      if (!script.hasAttribute("data-build")) {
+        const type = script.getAttribute("type") || "";
+        if (!type || type === "text/javascript" || type === "module") {
+          script.setAttribute("type", "text/plain;real-type=" + type);
+        }
       }
     }
-  });
+  );
 
   return doc.documentElement.outerHTML;
 }
 
+/**
+ * @private
+ * @param {WindowExt} window
+ */
 function collectLinksInBrowser(window) {
   const doc = window.document;
-  const base = doc.location;
+  const base = new URL(doc.location.href);
+  console.log({ base });
 
   const linked = new Set();
 
-  doc.querySelectorAll("*[href]").forEach(element => {
-    maybeAddLink(element.getAttribute("href"));
-  });
+  doc.querySelectorAll("*[href]").forEach(
+    /** @param {Element} element */
+    element => {
+      maybeAddLink(element.getAttribute("href") || "");
+    }
+  );
 
-  doc.querySelectorAll("*[src]").forEach(element => {
-    maybeAddLink(element.getAttribute("src"));
-  });
+  doc.querySelectorAll("*[src]").forEach(
+    /** @param {Element} element */
+    element => {
+      maybeAddLink(element.getAttribute("src") || "");
+    }
+  );
 
-  doc.querySelectorAll("*[srcset]").forEach(element => {
-    const parts = element.getAttribute("srcset").split(",");
-    parts.forEach(src => {
-      maybeAddLink(src.split(/\s+/)[0]);
-    });
-  });
+  doc.querySelectorAll("*[srcset]").forEach(
+    /** @param {Element} element */
+    element => {
+      const parts = (element.getAttribute("srcset") || "").split(",");
+      parts.forEach(src => {
+        maybeAddLink(src.split(/\s+/)[0]);
+      });
+    }
+  );
 
   // TODO: Other elements?
   // TODO: Check that linked files actually exist (and are not directories).
@@ -295,6 +366,10 @@ function collectLinksInBrowser(window) {
   // Set does not appear to serialize from puppeteer, so convert to an array.
   return Array.from(linked);
 
+  /**
+   * @private
+   * @param {string} relative
+   */
   function maybeAddLink(relative) {
     const url = new URL(relative, base);
     if (url.origin === base.origin) {
@@ -307,27 +382,42 @@ function collectLinksInBrowser(window) {
   }
 }
 
+/**
+ * @param {WindowExt} window
+ * @param {string} url
+ * @param {string} content
+ */
 function finalizeHTMLInBrowser(window, url, content) {
   const { DOMParser, Node } = window;
   const doc = new DOMParser().parseFromString(content, "text/html");
 
   // Remove elements with the data-build attribute.
-  doc.querySelectorAll("*[data-build]").forEach(element => {
-    // TODO(#4): Should we leave a comment in the output?
-    removeNodeAndWhitespace(element);
-  });
+  doc.querySelectorAll("*[data-build]").forEach(
+    /** @param {Element} element */
+    element => {
+      // TODO(#4): Should we leave a comment in the output?
+      removeNodeAndWhitespace(element);
+    }
+  );
 
   // Re-enable client-side JavaScript.
-  doc.querySelectorAll("script").forEach(script => {
-    const type = script.getAttribute("type");
-    const prefix = "text/plain;real-type=";
-    if (type.startsWith(prefix)) {
-      script.setAttribute("type", type.slice(prefix.length));
+  doc.querySelectorAll("script").forEach(
+    /** @param {Element} script */
+    script => {
+      const type = script.getAttribute("type") || "";
+      const prefix = "text/plain;real-type=";
+      if (type.startsWith(prefix)) {
+        script.setAttribute("type", type.slice(prefix.length));
+      }
     }
-  });
+  );
 
   return doc.documentElement.outerHTML;
 
+  /**
+   * @private
+   * @param {Node} node
+   */
   function removeNodeAndWhitespace(node) {
     const prev = node.previousSibling;
     if (prev && prev.nodeType === Node.TEXT_NODE) {
