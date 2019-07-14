@@ -30,6 +30,7 @@ import express from "express";
 
 /**
  * @param {Options} options
+ * @returns {express.RequestHandler}
  */
 export default function transformResponseSetup(options) {
   options = Object.assign({}, options);
@@ -42,6 +43,7 @@ export default function transformResponseSetup(options) {
    * @param {express.Request} req
    * @param {express.Response} res
    * @param {express.NextFunction} next
+   * @returns {void}
    */
   function transformResponse(req, res, next) {
     if (filterCallback && !filterCallback(req, res)) {
@@ -62,6 +64,7 @@ export default function transformResponseSetup(options) {
     /**
      * @private
      * @param {Array<any>} args
+     * @returns {boolean}
      */
     function write(...args) {
       if (ended) {
@@ -74,6 +77,7 @@ export default function transformResponseSetup(options) {
     /**
      * @private
      * @param {Array<any>} args
+     * @returns {boolean}
      */
     function end(...args) {
       if (ended) {
@@ -93,6 +97,7 @@ export default function transformResponseSetup(options) {
     /**
      * @private
      * @param {Array<any>} args
+     * @returns {void}
      */
     function doWrite(args) {
       const chunk = args.shift();
@@ -117,6 +122,7 @@ export default function transformResponseSetup(options) {
     /**
      * @private
      * @param {Buffer} content
+     * @returns {Promise<void>}
      */
     async function startTransform(content) {
       if (transformCallback) {

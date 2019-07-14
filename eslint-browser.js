@@ -3,6 +3,12 @@ module.exports = {
   env: {
     browser: true
   },
+  globals: {
+    "RequestInit": true
+  },
+  rules: {
+    "no-console": "warn"
+  },
   settings: {
     browsers: [
       // Browsers that support <script type="module"> (from caniuse.com).

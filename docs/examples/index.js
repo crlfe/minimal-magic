@@ -4,12 +4,18 @@ import { makeRelative } from "/lib/pathing.js";
 
 main().catch(console.error);
 
+/**
+ * @returns {Promise<void>}
+ */
 async function main() {
   const base = new URL(document.location.href);
   const urls = await fetchURLs(new URL("pages.txt", base));
   const docs = await Promise.all(
     urls.map(
-      /** @param {URL} url */
+      /**
+       * @param {URL} url
+       * @returns {Promise<[URL, object]>}
+       */
       async url => [url, await fetchLinkingData(url)]
     )
   );

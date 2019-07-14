@@ -4,7 +4,7 @@
  */
 
 import { h, insertAll } from "/lib/dom.js";
-import { fetchDocument, fetchLinkingData } from "/lib/fetching.js";
+import { fetchLinkingData } from "/lib/fetching.js";
 import { getParentDirectories, makeLinksRelative } from "/lib/pathing.js";
 import { addHtmlMetadata } from "/lib/metadata.js";
 
@@ -23,6 +23,7 @@ setupPage(document).catch(console.error);
 
 /**
  * @param {Document} doc
+ * @returns {Promise<void>}
  */
 async function setupPage(doc) {
   const isRootPage = /^\/(?:index.html)?$/.test(doc.location.pathname);
@@ -62,6 +63,7 @@ async function setupPage(doc) {
 
 /**
  * @param {Document} doc
+ * @returns {object}
  */
 function getPageLinkingData(doc) {
   const script = doc.head.querySelector('script[type="application/ld+json"]');
@@ -71,11 +73,12 @@ function getPageLinkingData(doc) {
 /**
  * @param {Document} doc
  * @param {object} ld
+ * @returns {Promise<Element>}
  */
 async function getSiteHeader(doc, ld) {
   const site = ld.isPartOf;
 
-  const breadcrumbs = await getBreadcrumbs(doc);
+  const breadcrumbs = await getBreadcrumbs(doc.location.pathname);
   const breadcrumbNav =
     breadcrumbs.length > 0 &&
     h("nav", {}, [
@@ -95,6 +98,7 @@ async function getSiteHeader(doc, ld) {
 /**
  * @param {Document} doc
  * @param {object} ld
+ * @returns {Element}
  */
 function getPageHeader(doc, ld) {
   return h("header", { class: "page" }, [
@@ -107,8 +111,10 @@ function getPageHeader(doc, ld) {
 /**
  * @param {Document} doc
  * @param {object} ld
+ * @returns {Element}
  */
 function getSiteFooter(doc, ld) {
+  void doc, ld;
   return h("footer", { class: "site" }, [
     "Copyright \xA9 2019 Chris Wolfe. " +
       "Licensed under the Apache License, Version 2.0"
@@ -116,26 +122,34 @@ function getSiteFooter(doc, ld) {
 }
 
 /**
- * @param {Document} doc
+ * @param {string} pathname
+ * @returns {Promise<Array<{name: string, route: string}>>}
  */
-async function getBreadcrumbs(doc) {
-  const routes = getParentDirectories(doc.location.pathname);
+async function getBreadcrumbs(pathname) {
+  const routes = getParentDirectories(pathname);
   routes.pop();
 
   return Promise.all(
-    routes.map(async route => {
-      if (route === "/") {
-        return { name: "Home", route };
-      } else {
-        const ld = await fetchLinkingData(route);
-        return { name: ld.headline, route };
+    routes.map(
+      /**
+       * @param {string} route
+       * @returns {Promise<{name: string, route: string}>}
+       */
+      async route => {
+        if (route === "/") {
+          return { name: "Home", route };
+        } else {
+          const ld = await fetchLinkingData(route);
+          return { name: ld.headline, route };
+        }
       }
-    })
+    )
   );
 }
 
 /**
  * @param {string} source
+ * @returns {string}
  */
 function formatLongDate(source) {
   return new Date(source).toLocaleDateString("en", {

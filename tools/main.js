@@ -64,6 +64,7 @@ limitations under the License.
 
 /**
  * @param {string[]} argv
+ * @returns {Promise<void>}
  */
 export default async function main(argv) {
   const usageError = genericUsageError.bind(null, ["minimal-magic"]);
@@ -89,6 +90,7 @@ export default async function main(argv) {
 /**
  * @param {object} options
  * @param {string[]} operands
+ * @returns {Promise<void>}
  */
 async function doBuild(options, operands) {
   const usageError = genericUsageError.bind(null, ["minimal-magic", "build"]);
@@ -126,6 +128,7 @@ async function doBuild(options, operands) {
 /**
  * @param {object} options
  * @param {string[]} operands
+ * @returns {Promise<void>}
  */
 async function doServe(options, operands) {
   const usageError = genericUsageError.bind(null, ["minimal-magic", "serve"]);
@@ -165,6 +168,7 @@ async function doServe(options, operands) {
 /**
  * @param {string[]} context
  * @param {string} message
+ * @returns {void}
  */
 function genericUsageError(context, message) {
   console.error(
@@ -179,6 +183,7 @@ function genericUsageError(context, message) {
 /**
  * @param {string} message
  * @param {Error} err
+ * @returns {void}
  */
 function fatalError(message, err) {
   console.error(message + ":\n  " + err.message.replace(/\n/g, "\n  "));
@@ -190,6 +195,7 @@ function fatalError(message, err) {
  * @param {object} $1
  * @param {(message: string) => void} $1.usageError
  * @param {(message: string, err: Error) => void} $1.fatalError
+ * @returns {boolean}
  */
 function checkSourceDirectory(src, { usageError, fatalError }) {
   try {
@@ -218,6 +224,7 @@ function checkSourceDirectory(src, { usageError, fatalError }) {
  * @param {object} $1
  * @param {(message: string) => void} $1.usageError
  * @param {(message: string, err: Error) => void} $1.fatalError
+ * @returns {Promise<boolean>}
  */
 async function ensureOutputDirectory(out, { usageError, fatalError }) {
   try {
