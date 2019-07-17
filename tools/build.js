@@ -23,8 +23,13 @@ const mkdirpPromise = util.promisify(mkdirp);
 const copyFilePromise = util.promisify(fs.copyFile);
 const writeFilePromise = util.promisify(fs.writeFile);
 
+/**
+ * Manages state for the build process.
+ */
 class Builder {
   /**
+   * Initialize the builder.
+   *
    * @param {string} src
    * @returns {Promise<void>}
    */
@@ -61,6 +66,8 @@ class Builder {
    */
 
   /**
+   * Builds an HTML page.
+   *
    * @param {string} route
    * @returns {Promise<BuildResult>}
    */
@@ -108,6 +115,8 @@ class Builder {
   }
 
   /**
+   * Cleans up resources.
+   *
    * @returns {Promise<void>}
    */
   async stop() {
@@ -131,6 +140,8 @@ class Builder {
   }
 
   /**
+   * Creates the express middleware used by the build server.
+   *
    * @private
    * @param {string} src
    * @returns {express.Express}
@@ -153,6 +164,10 @@ class Builder {
   }
 
   /**
+   * Transforms source HTML for the build server.
+   *
+   * This calls {@link prepareHTMLInBrowser}.
+   *
    * @private
    * @param {string} route
    * @param {string} content
@@ -172,6 +187,10 @@ class Builder {
   }
 
   /**
+   * Transforms generated HTML to save as output.
+   *
+   * This calls {@link finalizeHTMLInBrowser}.
+   *
    * @private
    * @param {URL} pageUrl
    * @param {string} content
@@ -200,6 +219,8 @@ class Builder {
 }
 
 /**
+ * Runs the build process.
+ *
  * @param {object} $0
  * @param {string} $0.src
  * @param {string} $0.out
@@ -294,6 +315,10 @@ export default async function build({ src, out }) {
 }
 
 /**
+ * Transforms source HTML for the build server.
+ *
+ * This function is run by Puppeteer in a browser environment.
+ *
  * @private
  * @param {WindowExt} window
  * @param {string} url
@@ -321,6 +346,10 @@ function prepareHTMLInBrowser(window, url, content) {
 }
 
 /**
+ * Transforms generated HTML to save as output.
+ *
+ * This function is run by Puppeteer in a browser environment.
+ *
  * @param {WindowExt} window
  * @param {string} pageUrlHref
  * @param {string} content
@@ -357,6 +386,8 @@ function finalizeHTMLInBrowser(window, pageUrlHref, content) {
   return { content: doc.documentElement.outerHTML, linked };
 
   /**
+   * Removes a node and some adjacent whitespace.
+   *
    * @private
    * @param {Node} node
    * @returns {void}
@@ -376,6 +407,8 @@ function finalizeHTMLInBrowser(window, pageUrlHref, content) {
   }
 
   /**
+   * Collects links to other resources mentioned by the document.
+   *
    * @private
    * @param {Document} doc
    * @returns {Array<string>}
@@ -408,6 +441,8 @@ function finalizeHTMLInBrowser(window, pageUrlHref, content) {
     );
 
     /**
+     * Adds local links to the linked set.
+     *
      * @private
      * @param {string} relative
      * @param {URL} pageUrl

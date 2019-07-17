@@ -16,6 +16,7 @@
  * @param {express.Response} res
  * @param {Buffer} content
  * @returns {Promise<Buffer>}
+ */
 
 /**
  * @typedef {{
@@ -29,6 +30,8 @@
 import express from "express";
 
 /**
+ * Creates a request handler that transforms content from later handlers.
+ *
  * @param {Options} options
  * @returns {express.RequestHandler}
  */
@@ -39,6 +42,8 @@ export default function transformResponseSetup(options) {
   const transformCallback = options.transform;
 
   /**
+   * Transforms content from later handlers.
+   *
    * @private
    * @param {express.Request} req
    * @param {express.Response} res
@@ -62,6 +67,8 @@ export default function transformResponseSetup(options) {
     next();
 
     /**
+     * Wraps the Response.write function to buffer content.
+     *
      * @private
      * @param {Array<any>} args
      * @returns {boolean}
@@ -75,6 +82,8 @@ export default function transformResponseSetup(options) {
     }
 
     /**
+     * Wraps the Response.end function to transform content.
+     *
      * @private
      * @param {Array<any>} args
      * @returns {boolean}
@@ -95,6 +104,8 @@ export default function transformResponseSetup(options) {
     }
 
     /**
+     * Adds data to the buffered content.
+     *
      * @private
      * @param {Array<any>} args
      * @returns {void}
@@ -120,6 +131,8 @@ export default function transformResponseSetup(options) {
     }
 
     /**
+     * Transforms the buffered content and passes it to the response.
+     *
      * @private
      * @param {Buffer} content
      * @returns {Promise<void>}

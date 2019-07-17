@@ -63,6 +63,8 @@ limitations under the License.
 `;
 
 /**
+ * Runs the minimal-magic tool.
+ *
  * @param {string[]} argv
  * @returns {Promise<void>}
  */
@@ -88,6 +90,8 @@ export default async function main(argv) {
 }
 
 /**
+ * Runs the minimal-magic build command.
+ *
  * @param {object} options
  * @param {string[]} operands
  * @returns {Promise<void>}
@@ -126,6 +130,8 @@ async function doBuild(options, operands) {
 }
 
 /**
+ * Runs the minimal-magic serve command.
+ *
  * @param {object} options
  * @param {string[]} operands
  * @returns {Promise<void>}
@@ -166,6 +172,8 @@ async function doServe(options, operands) {
 }
 
 /**
+ * Reports a usage error and sets the process exit code to 2.
+ *
  * @param {string[]} context
  * @param {string} message
  * @returns {void}
@@ -181,6 +189,8 @@ function genericUsageError(context, message) {
 }
 
 /**
+ * Reports a fatal error and sets the process exit code to 1.
+ *
  * @param {string} message
  * @param {Error} err
  * @returns {void}
@@ -191,6 +201,8 @@ function fatalError(message, err) {
 }
 
 /**
+ * Checks that a source directory is usable.
+ *
  * @param {string} src
  * @param {object} $1
  * @param {(message: string) => void} $1.usageError
@@ -220,6 +232,8 @@ function checkSourceDirectory(src, { usageError, fatalError }) {
 }
 
 /**
+ * Checks that an output directory is usable, creating it if missing.
+ *
  * @param {string} out
  * @param {object} $1
  * @param {(message: string) => void} $1.usageError
@@ -257,6 +271,8 @@ async function ensureOutputDirectory(out, { usageError, fatalError }) {
 }
 
 /**
+ * Parses an array of command-line arguments.
+ *
  * @param {string[]} args
  * @returns {{options: object, operands: string[]}}
  */

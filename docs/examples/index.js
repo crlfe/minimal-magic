@@ -5,6 +5,8 @@ import { makeRelative } from "/lib/pathing.js";
 main().catch(console.error);
 
 /**
+ * Builds the page.
+ *
  * @returns {Promise<void>}
  */
 async function main() {

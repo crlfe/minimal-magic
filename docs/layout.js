@@ -22,6 +22,8 @@ const SITE = {
 setupPage(document).catch(console.error);
 
 /**
+ * Builds the page.
+ *
  * @param {Document} doc
  * @returns {Promise<void>}
  */
@@ -62,6 +64,10 @@ async function setupPage(doc) {
 }
 
 /**
+ * Gets JSON-LD linking data from a document.
+ *
+ * This uses the first script type="application/ld+json" tag in the head.
+ *
  * @param {Document} doc
  * @returns {object}
  */
@@ -71,6 +77,8 @@ function getPageLinkingData(doc) {
 }
 
 /**
+ * Generates the site header.
+ *
  * @param {Document} doc
  * @param {object} ld
  * @returns {Promise<Element>}
@@ -96,6 +104,8 @@ async function getSiteHeader(doc, ld) {
 }
 
 /**
+ * Generates the page header.
+ *
  * @param {Document} doc
  * @param {object} ld
  * @returns {Element}
@@ -109,6 +119,8 @@ function getPageHeader(doc, ld) {
 }
 
 /**
+ * Generates the site footer.
+ *
  * @param {Document} doc
  * @param {object} ld
  * @returns {Element}
@@ -122,6 +134,8 @@ function getSiteFooter(doc, ld) {
 }
 
 /**
+ * Gets information about parent directories needed to display breadcrumbs.
+ *
  * @param {string} pathname
  * @returns {Promise<Array<{name: string, route: string}>>}
  */
@@ -148,6 +162,8 @@ async function getBreadcrumbs(pathname) {
 }
 
 /**
+ * Formats a date like "July 17, 2019".
+ *
  * @param {string} source
  * @returns {string}
  */

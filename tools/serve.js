@@ -7,6 +7,8 @@ import liveServer from "live-server";
 import path from "path";
 
 /**
+ * Runs a development server.
+ *
  * @param {object} $0
  * @param {string} $0.src
  * @param {string} $0.host

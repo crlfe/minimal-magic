@@ -23,11 +23,20 @@ module.exports = {
         definedTypes: ["ParentNode", "void"]
       }
     ],
-    "jsdoc/require-returns": [
+    "jsdoc/require-description": [
       "error",
       {
-        forceRequireReturn: true
+        contexts: [
+          /* exclude "ArrowFunctionExpression", */
+          "ClassDeclaration",
+          "FunctionDeclaration",
+          "FunctionExpression"
+        ]
       }
-    ]
+    ],
+    "jsdoc/require-description-complete-sentence": "error",
+    "jsdoc/require-param-description": "off",
+    "jsdoc/require-returns": "error",
+    "jsdoc/require-returns-description": "off"
   }
 };
